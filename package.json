@@ -1,0 +1,17 @@
+{
+  "name": "content-change-ledger",
+  "version": "0.0.0",
+  "description": "Record why a content field changed and connect it to a release or owner.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/edilec/content-change-ledger"
+  }
+}
