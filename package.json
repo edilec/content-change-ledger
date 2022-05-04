@@ -1,17 +1,51 @@
 {
   "name": "content-change-ledger",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Record why a content field changed and connect it to a release or owner.",
   "type": "module",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "test": "node --test"
+    "lint": "node --check src/event.mjs && node --check src/ledger.mjs && node --check src/index.mjs && node --check bin/content-change-ledger.mjs && node --check test/event.test.mjs && node --check test/verify.test.mjs && node --check test/append.test.mjs && node --check test/cli.test.mjs",
+    "test": "node --test",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-include=src/**",
+    "example": "node bin/content-change-ledger.mjs verify examples/ledger.jsonl --config examples/ledger-policy.json",
+    "pack:check": "npm pack --dry-run",
+    "check": "npm run lint && npm test && npm run example && npm run pack:check"
   },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/edilec/content-change-ledger"
-  }
+    "url": "git+https://github.com/edilec/content-change-ledger.git"
+  },
+  "bin": {
+    "content-change-ledger": "./bin/content-change-ledger.mjs"
+  },
+  "exports": {
+    ".": "./src/index.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "examples",
+    "docs",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "ledger",
+    "append-only",
+    "hash-chain",
+    "audit",
+    "content",
+    "provenance",
+    "cli"
+  ],
+  "author": "Edilec Private Limited",
+  "bugs": {
+    "url": "https://github.com/edilec/content-change-ledger/issues"
+  },
+  "homepage": "https://github.com/edilec/content-change-ledger#readme"
 }
