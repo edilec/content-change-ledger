@@ -264,6 +264,7 @@ function verifyRecords(ledger, records, config, state) {
   const subjects = new Map()
   let previousEvent = null
   let knownPrevious = true
+  let stateKnown = true
   let lastRecordedAt = null
   let checkedHere = 0
 
@@ -287,6 +288,14 @@ function verifyRecords(ledger, records, config, state) {
         ))
       }
       knownPrevious = false
+      /* The contents of that line are now unknown for good. Every later check
+         that compares against what this ledger has recorded so far -- the
+         subject state machine, the before/after continuity, and whether a
+         correction names an event this file holds -- would be answering from
+         evidence the run never obtained, so they stop here. The chain link
+         across the gap is skipped for the same reason, and the run is already
+         `incomplete`, which is what says so. */
+      stateKnown = false
       continue
     }
 
@@ -353,8 +362,8 @@ function verifyRecords(ledger, records, config, state) {
     }
     lastRecordedAt = event.recordedAt
 
-    checkSubject(event, subjects, where, findings)
-    checkCorrection(event, record, ids, where, findings)
+    checkSubject(event, subjects, where, findings, stateKnown)
+    checkCorrection(event, ids, where, findings, stateKnown)
 
     if (config.owners !== null && !config.owners.includes(event.owner)) {
       findings.push(finding(
@@ -383,9 +392,14 @@ function verifyRecords(ledger, records, config, state) {
 }
 
 /** The state machine every subject follows, and the before/after hash continuity it implies. */
-function checkSubject(event, subjects, where, findings) {
+function checkSubject(event, subjects, where, findings, stateKnown) {
   const current = subjects.get(event.subject) ?? { exists: false, hash: null }
   let stateValid = true
+
+  if (!stateKnown) {
+    subjects.set(event.subject, { exists: event.afterHash !== null, hash: event.afterHash })
+    return
+  }
 
   if (event.action === 'create' && current.exists) {
     stateValid = false
@@ -422,11 +436,12 @@ function checkSubject(event, subjects, where, findings) {
 }
 
 /** A correction names an earlier event, about the same subject, and never itself. */
-function checkCorrection(event, record, ids, where, findings) {
+function checkCorrection(event, ids, where, findings, stateKnown) {
   if (event.corrects === null) return
   const targetLine = ids.get(event.corrects)
 
   if (targetLine === undefined) {
+    if (!stateKnown) return
     findings.push(finding(
       'correction-target-unknown',
       `This correction names event id "${sanitize(event.corrects, 80)}", which no earlier event in this ledger records.`,
@@ -743,14 +758,16 @@ export async function appendEvent(ledgerPath, draft, options = {}) {
   }
 
   let stateHash = null
-  let exists = false
   for (const event of events) {
     if (event.subject !== draft.subject) continue
     stateHash = event.afterHash
-    exists = event.afterHash !== null
   }
 
-  const beforeHash = draft.beforeHash === undefined ? stateHash : draft.beforeHash
+  /* A create starts from nothing by definition, so it never inherits a state
+     hash: creating a subject the ledger already holds must be refused as a
+     state error rather than quietly turned into something else. */
+  const inherited = draft.action === 'create' ? null : stateHash
+  const beforeHash = draft.beforeHash === undefined ? inherited : draft.beforeHash
   const event = createEvent({ ...draft, id, beforeHash }, last === null ? null : last.hash, limits)
 
   const check = verifyLedgers(

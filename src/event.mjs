@@ -178,11 +178,16 @@ export function validateEventShape(value, limits = DEFAULT_LIMITS) {
       problems.push(fieldProblem(field, `"${field}" contains a control character or line separator`))
       continue
     }
-    const allowed = field === 'reason' ? limits.maxReasonLength : limits.maxFieldLength
-    if (Array.from(raw).length > allowed) {
-      problems.push(fieldProblem(field, `"${field}" is longer than the ${
-        field === 'reason' ? 'maxReasonLength' : 'maxFieldLength'} limit of ${allowed}`))
-      continue
+    /* Hashes and the timestamp are bounded by their own exact formats, checked
+       below. The configurable length limits govern the free-text fields only,
+       so lowering one can never make a well-formed hash unrepresentable. */
+    if (!HASH_FIELDS.includes(field) && field !== 'recordedAt') {
+      const allowed = field === 'reason' ? limits.maxReasonLength : limits.maxFieldLength
+      if (Array.from(raw).length > allowed) {
+        problems.push(fieldProblem(field, `"${field}" is longer than the ${
+          field === 'reason' ? 'maxReasonLength' : 'maxFieldLength'} limit of ${allowed}`))
+        continue
+      }
     }
     if (HASH_FIELDS.includes(field) && !HASH_PATTERN.test(raw)) {
       problems.push(fieldProblem(field, `"${field}" must look like sha256:<64 lowercase hex digits>`))
