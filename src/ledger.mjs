@@ -157,8 +157,6 @@ export async function readLedgers(paths, options = {}) {
   return { root: realRoot ?? resolve(options.root ?? options.cwd ?? process.cwd()), ledgers, failures }
 }
 
-const CLOCK_CHECK_INTERVAL = 128
-
 /**
  * Parse one ledger's text into records, one per non-blank line.
  *
@@ -186,7 +184,7 @@ export function parseLedger(text, options = {}) {
       limitProblem = new LimitExceeded('maxEvents', limits.maxEvents, records.length + 1, line)
       break
     }
-    if (records.length % CLOCK_CHECK_INTERVAL === 0 && clock() - started > limits.timeLimitMs) {
+    if (clock() - started > limits.timeLimitMs) {
       limitProblem = new LimitExceeded('timeLimitMs', limits.timeLimitMs, Math.round(clock() - started), line)
       break
     }

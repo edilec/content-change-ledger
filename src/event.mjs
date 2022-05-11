@@ -9,8 +9,6 @@
 
 import { createHash } from 'node:crypto'
 
-export const LEDGER_SCHEMA_VERSION = '1'
-
 /** The hashed fields, in canonical order. `hash` is not one of them: it covers them. */
 export const EVENT_FIELDS = Object.freeze([
   'id',

@@ -22,7 +22,6 @@ import {
   EVENT_FIELDS,
   EVENT_KEYS,
   EventError,
-  LEDGER_SCHEMA_VERSION,
   byCodeUnit,
   canonicalEvent,
   createEvent,
@@ -50,7 +49,6 @@ export {
   EVENT_FIELDS,
   EVENT_KEYS,
   EventError,
-  LEDGER_SCHEMA_VERSION,
   LedgerError,
   LimitExceeded,
   byCodeUnit,
@@ -573,9 +571,28 @@ function buildReport(state, counts, extra = {}) {
     findings,
     ...extra,
   }
-  /* A last guard: a run that verified nothing must never be reported as a pass. */
+  return assertEvidenceBacked(report)
+}
+
+/**
+ * The two invariants every report must satisfy before it leaves this module.
+ *
+ * A run that verified nothing is never a pass, and a finding that means
+ * evidence was missing is never carried by anything but an `incomplete` report.
+ * Both are checked here rather than trusted at each construction site, so a
+ * flag forgotten anywhere above fails loudly instead of quietly turning an
+ * unread input green.
+ */
+export function assertEvidenceBacked(report) {
   if (report.status === 'pass' && report.summary.checked === 0) {
     throw new Error('Refusing to report a pass with no verified event')
+  }
+  if (report.status !== 'incomplete') {
+    for (const item of report.findings) {
+      if (INCOMPLETE_RULES.includes(item.ruleId)) {
+        throw new Error(`Finding "${item.ruleId}" means evidence was missing, so the report must be incomplete`)
+      }
+    }
   }
   return report
 }

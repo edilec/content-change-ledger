@@ -68,33 +68,38 @@ Rule ids are stable. Renaming one is a breaking change and is recorded in the
 changelog. Severity comes from one frozen table in `src/index.mjs`, and this
 catalog is asserted against that table in both directions by the test suite.
 
-| ruleId | Severity | What it means |
-| :------------------------------ | :------ | :----------------------------------- |
-| `ledger-unreadable` | error | A named ledger could not be opened or read |
-| `ledger-outside-root` | error | A named ledger resolves outside the declared root |
-| `ledger-not-utf8` | error | A ledger's bytes are not valid UTF-8 |
-| `ledger-not-text` | error | A ledger contains NUL bytes |
-| `limit-exceeded` | error | A declared bound was reached; the run stopped there |
-| `event-not-json` | error | A line is not JSON |
-| `event-not-object` | error | A line is JSON but not an object |
-| `event-field-missing` | error | An event is missing one of the twelve fields |
-| `event-field-invalid` | error | A field has the wrong type, shape or length |
-| `event-field-unknown` | error | An event carries a field the format does not define |
-| `event-id-duplicate` | error | Two events share an id |
-| `event-hash-mismatch` | error | An event does not match its own recorded hash |
-| `chain-genesis-invalid` | error | The first event records a previousHash, so the front is missing |
-| `chain-previous-hash-mismatch` | error | An event does not chain to the line above it |
-| `subject-hash-discontinuity` | error | A beforeHash is not the last afterHash recorded for that subject |
-| `subject-state-invalid` | error | A subject was created twice, or changed before it existed |
-| `correction-target-unknown` | error | A correction names an id no earlier event records |
-| `correction-target-invalid` | error | A correction names itself |
-| `event-owner-not-allowed` | error | An owner outside the configured `owners` list |
-| `event-release-id-not-allowed` | error | A release id that does not match `releaseIdPattern` |
-| `checkpoint-mismatch` | error | The last event is not the configured head checkpoint |
-| `ledger-empty` | warning | A ledger holds no verifiable event, so nothing was verified |
-| `event-recorded-at-out-of-order` | warning | An event is recorded earlier than the line above it |
-| `history-truncated` | warning | A query matched more events than its limit returned |
-| `tail-not-anchored` | info | No head checkpoint is configured, so tail truncation is undetectable |
+The **Incomplete** column says whether the finding means evidence was missing.
+A report carrying any rule marked `yes` can only have status `incomplete`; the
+report builder throws rather than emit it any other way, so a forgotten flag
+cannot turn an unread input green.
+
+| ruleId | Severity | Incomplete | What it means |
+| :------------------------------ | :------ | :--------- | :-------------------- |
+| `ledger-unreadable` | error | yes | A named ledger could not be opened or read |
+| `ledger-outside-root` | error | yes | A named ledger resolves outside the declared root |
+| `ledger-not-utf8` | error | yes | A ledger's bytes are not valid UTF-8 |
+| `ledger-not-text` | error | yes | A ledger contains NUL bytes |
+| `limit-exceeded` | error | yes | A declared bound was reached; the run stopped there |
+| `event-not-json` | error | yes | A line is not JSON |
+| `event-not-object` | error | yes | A line is JSON but not an object |
+| `event-field-missing` | error | yes | An event is missing one of the twelve fields |
+| `event-field-invalid` | error | yes | A field has the wrong type, shape or length |
+| `event-field-unknown` | error | yes | An event carries a field the format does not define |
+| `event-id-duplicate` | error | no | Two events share an id |
+| `event-hash-mismatch` | error | no | An event does not match its own recorded hash |
+| `chain-genesis-invalid` | error | no | The first event records a previousHash, so the front is missing |
+| `chain-previous-hash-mismatch` | error | no | An event does not chain to the line above it |
+| `subject-hash-discontinuity` | error | no | A beforeHash is not the last afterHash recorded for that subject |
+| `subject-state-invalid` | error | no | A subject was created twice, or changed before it existed |
+| `correction-target-unknown` | error | no | A correction names an id no earlier event records |
+| `correction-target-invalid` | error | no | A correction names itself |
+| `event-owner-not-allowed` | error | no | An owner outside the configured `owners` list |
+| `event-release-id-not-allowed` | error | no | A release id that does not match `releaseIdPattern` |
+| `checkpoint-mismatch` | error | no | The last event is not the configured head checkpoint |
+| `ledger-empty` | warning | yes | A ledger holds no verifiable event, so nothing was verified |
+| `event-recorded-at-out-of-order` | warning | no | An event is recorded earlier than the line above it |
+| `history-truncated` | warning | yes | A query matched more events than its limit returned |
+| `tail-not-anchored` | info | no | No head checkpoint is configured, so tail truncation is undetectable |
 
 ## What "unknown" means here
 

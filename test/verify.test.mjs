@@ -9,9 +9,11 @@ import {
   DEFAULT_LIMITS,
   INCOMPLETE_RULES,
   RULES,
+  assertEvidenceBacked,
   createEvent,
   parseConfig,
   parseLedger,
+  historyReport,
   readLedgers,
   serializeEvent,
   verifyLedgers,
@@ -213,6 +215,34 @@ test('an empty ledger is incomplete, because a run that verified nothing is neve
   assert.equal(blank.summary.checked, 0)
 })
 
+test('a report that names missing evidence can only be incomplete', () => {
+  const healthy = { status: 'fail', summary: { checked: 3 }, findings: [{ ruleId: 'event-id-duplicate' }] }
+  assert.equal(assertEvidenceBacked(healthy), healthy)
+
+  for (const ruleId of INCOMPLETE_RULES) {
+    assert.throws(
+      () => assertEvidenceBacked({ status: 'fail', summary: { checked: 3 }, findings: [{ ruleId }] }),
+      new RegExp(`Finding "${ruleId}" means evidence was missing`),
+      `${ruleId} was allowed on a report that is not incomplete`,
+    )
+    assert.doesNotThrow(
+      () => assertEvidenceBacked({ status: 'incomplete', summary: { checked: 3 }, findings: [{ ruleId }] }),
+    )
+  }
+  assert.throws(
+    () => assertEvidenceBacked({ status: 'pass', summary: { checked: 0 }, findings: [] }),
+    /Refusing to report a pass with no verified event/,
+  )
+})
+
+test('a run with nothing at all to verify refuses to report a pass', () => {
+  /* The last guard, reached when there is not even an empty ledger to name:
+     "checked: 0" can never be green, whatever the flags say. */
+  assert.throws(() => verifyLedgers([]), /Refusing to report a pass with no verified event/)
+  assert.throws(() => historyReport([], {}), /Refusing to report a pass with no verified event/)
+  assert.equal(run('').status, 'incomplete')
+})
+
 test('each declared bound is enforced and named, and none truncates in silence', () => {
   const events = chain(DRAFTS)
   const text = textOf(events)
@@ -345,14 +375,18 @@ test('every rule in the catalog is documented, and every documented rule exists'
   const docs = await readFile(fileURLToPath(new URL('../docs/ledger-rules.md', import.meta.url)), 'utf8')
   const documented = new Map()
   for (const line of docs.split(NEWLINE)) {
-    const match = /^\| `([a-z0-9-]+)` \| (error|warning|info) \|/.exec(line)
-    if (match !== null) documented.set(match[1], match[2])
+    const match = /^\| `([a-z0-9-]+)` \| (error|warning|info) \| (yes|no) \|/.exec(line)
+    if (match !== null) documented.set(match[1], { severity: match[2], incomplete: match[3] === 'yes' })
   }
+  assert.equal(documented.size, Object.keys(RULES).length)
   assert.deepEqual([...documented.keys()].sort(), Object.keys(RULES).sort())
-  for (const [ruleId, severity] of documented) {
-    assert.equal(RULES[ruleId], severity, `docs and code disagree about ${ruleId}`)
+  for (const [ruleId, entry] of documented) {
+    assert.equal(RULES[ruleId], entry.severity, `docs and code disagree about the severity of ${ruleId}`)
+    assert.equal(INCOMPLETE_RULES.includes(ruleId), entry.incomplete,
+      `docs and code disagree about whether ${ruleId} forces an incomplete run`)
   }
-  for (const ruleId of INCOMPLETE_RULES) assert.ok(Object.hasOwn(RULES, ruleId))
+  assert.deepEqual([...INCOMPLETE_RULES].sort(),
+    [...documented].filter(([, entry]) => entry.incomplete).map(([ruleId]) => ruleId).sort())
 })
 
 test('an untrusted identifier cannot forge a line in the human report', () => {

@@ -207,6 +207,25 @@ test('a history the limit cut short exits 2 and says which limit cut it', async 
   assert.equal(bad.stdout, '')
 })
 
+test('the documented time budget is wired through the command line', async () => {
+  await withDirectory(async (directory) => {
+    /* The bug this guards against is a limit that the library enforces and the
+       CLI never wires a clock through, so the documented budget is accepted and
+       ignored. Five thousand lines cannot be parsed inside one millisecond. */
+    const line = (await readFile(join(ROOT, 'examples/ledger.jsonl'), 'utf8')).split(NEWLINE)[0]
+    await writeFile(join(directory, 'long.jsonl'), `${new Array(5_000).fill(line).join(NEWLINE)}${NEWLINE}`, 'utf8')
+    await writeFile(join(directory, 'fast.json'), '{"schemaVersion":"1","limits":{"timeLimitMs":1}}', 'utf8')
+
+    const result = await cli(['verify', 'long.jsonl', '--config', 'fast.json', '--root', directory, '--json'], directory)
+    assert.equal(result.code, 2)
+    const report = JSON.parse(result.stdout)
+    assert.equal(report.status, 'incomplete')
+    const limit = report.findings.find((item) => item.ruleId === 'limit-exceeded')
+    assert.match(limit.message, /timeLimitMs limit of 1 was exceeded/)
+    assert.ok(report.summary.checked < 5_000, 'the run claimed to have read past the budget')
+  })
+})
+
 test('two runs over the same ledger produce byte-identical output', async () => {
   const args = ['verify', 'examples/broken-ledger.jsonl', '--json']
   const first = await cli(args)

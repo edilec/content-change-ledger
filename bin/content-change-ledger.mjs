@@ -16,7 +16,6 @@ import { performance } from 'node:perf_hooks'
 
 import {
   ACTIONS,
-  LedgerError,
   LimitExceeded,
   appendEvent,
   decodeUtf8,
@@ -255,9 +254,7 @@ async function main(argv) {
     if (options.command === 'history') return await runHistory(options)
     return await runAppend(options)
   } catch (error) {
-    const detail = error instanceof LimitExceeded
-      ? `limit exceeded: ${error.message}`
-      : error instanceof LedgerError ? error.message : error.message
+    const detail = error instanceof LimitExceeded ? `limit exceeded: ${error.message}` : error.message
     process.stderr.write(`${detail}\n`)
     return 2
   }
