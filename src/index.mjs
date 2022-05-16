@@ -135,18 +135,24 @@ function positiveInteger(value) {
 }
 
 /**
- * Build one finding, taking severity from the frozen catalog.
+ * The severity of one rule, read from the frozen catalog.
  *
- * A rule id the catalog does not know throws here instead of producing a
- * finding with an invented severity, so a typo cannot quietly downgrade a
- * refusal into a warning.
+ * A rule id the catalog does not know throws here instead of yielding a finding
+ * with an invented severity, so a typo cannot quietly downgrade a refusal into
+ * a warning. It is exported because a guard no caller can reach is a guard no
+ * test can prove.
  */
-function finding(ruleId, message, where, extra = {}) {
+export function severityOf(ruleId) {
   const severity = RULES[ruleId]
   if (severity === undefined) throw new Error(`Unknown ruleId "${sanitize(ruleId, 64)}"`)
+  return severity
+}
+
+/** Build one finding, taking its severity from the catalog and nowhere else. */
+function finding(ruleId, message, where, extra = {}) {
   return {
     ruleId,
-    severity,
+    severity: severityOf(ruleId),
     message,
     location: { file: sanitize(where.file, 200), pointer: where.pointer },
     line: where.line,

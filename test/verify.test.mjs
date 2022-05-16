@@ -16,6 +16,7 @@ import {
   historyReport,
   readLedgers,
   serializeEvent,
+  severityOf,
   verifyLedgers,
 } from '../src/index.mjs'
 
@@ -368,7 +369,19 @@ test('every finding takes its severity from the frozen catalog, and an unknown r
     assert.equal(item.severity, RULES[item.ruleId], `${item.ruleId} did not take its severity from the catalog`)
   }
   assert.ok(Object.isFrozen(RULES))
-  assert.equal(RULES['no-such-rule'], undefined)
+})
+
+test('a rule id the catalog does not know throws instead of inventing a severity', () => {
+  /* The lookup every finding goes through, called directly. Asserting that
+     RULES['no-such-rule'] is undefined would assert JavaScript, not this
+     package: the guard is the throw, so the throw is what is called here. */
+  assert.equal(severityOf('event-id-duplicate'), 'error')
+  assert.equal(severityOf('ledger-empty'), 'warning')
+  assert.equal(severityOf('tail-not-anchored'), 'info')
+  assert.throws(() => severityOf('no-such-rule'), /Unknown ruleId "no-such-rule"/)
+  assert.throws(() => severityOf(undefined), /Unknown ruleId "undefined"/)
+  /* Including when the unknown id is hostile: the refusal quotes it escaped. */
+  assert.throws(() => severityOf(`evt${String.fromCharCode(0x2028)}x`), /Unknown ruleId "evt\\u2028x"/)
 })
 
 test('every rule in the catalog is documented, and every documented rule exists', async () => {

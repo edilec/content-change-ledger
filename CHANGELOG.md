@@ -40,8 +40,13 @@ removed from the source:
   and the run is `incomplete`;
 - `pass` with `checked: 0` cannot be emitted: an empty ledger is `ledger-empty`
   and `incomplete`, and the report builder refuses a pass that verified nothing;
-- severity comes from one frozen `ruleId -> severity` table, asserted against the
-  documented catalog in both directions; an unknown rule id throws;
+- severity comes from one frozen `ruleId -> severity` table, and what each rule
+  does to a run is pinned by a real run: every rule in the catalog has a fixture
+  driven through the command line, asserting the exit code, the status and the
+  error, warning and info counts it produces. A severity changed in the table,
+  the documented catalog and a test map together still fails, because the
+  observed outcome changes. An unknown rule id throws, and the lookup that
+  throws is exported so that guard can be called;
 - ledgers and the configuration file are both decoded with
   `TextDecoder('utf-8', { fatal: true })`; encoding validity is never inferred
   from decoded text;
