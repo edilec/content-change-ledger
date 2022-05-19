@@ -284,6 +284,33 @@ test('a query refuses an unknown filter, a bad limit and an unknown action', () 
   )
 })
 
+test('a malformed time window is refused, never answered with an authoritative nothing', async () => {
+  await withDirectory(async (directory) => {
+    const { options } = await seed(directory)
+    const { ledgers } = await readLedgers(['ledger.jsonl'], options)
+
+    /* A window that matches nothing because it is a typo would otherwise come
+       back as a complete, green "no events changed" -- the same answer a real
+       empty window gives, with none of the evidence. */
+    for (const malformed of ['garbage', '2026-13-45', '2026-09-02', '2026-09-02T00:00:00Z',
+      '2026-09-02T00:00:00.000+01:00', '2026-02-30T00:00:00.000Z', 42]) {
+      for (const key of ['since', 'until']) {
+        assert.throws(
+          () => historyReport(ledgers, { [key]: malformed }),
+          new RegExp(`Query "${key}" must be a UTC timestamp`),
+          `${key}=${String(malformed)} was accepted`,
+        )
+        assert.throws(() => queryHistory([], { [key]: malformed }), new RegExp(`Query "${key}" must be a UTC timestamp`))
+      }
+    }
+
+    /* The one spelling the ledger itself uses is still accepted, and still filters. */
+    const window = historyReport(ledgers, { since: '2026-09-02T00:00:00.000Z', until: '2026-09-02T23:59:59.999Z' })
+    assert.deepEqual(window.entries.map((entry) => entry.id), ['evt-0002'])
+    assert.equal(window.status, 'pass')
+  })
+})
+
 test('a query over a ledger it could not read in full says so', async () => {
   await withDirectory(async (directory) => {
     const { path, options } = await seed(directory)

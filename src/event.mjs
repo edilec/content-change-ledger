@@ -95,6 +95,11 @@ export function sanitize(text, max = 120) {
   return out
 }
 
+/** True when a string is a UTC instant in the one spelling this tool accepts. */
+export function isUtcTimestamp(value) {
+  return typeof value === 'string' && TIMESTAMP_PATTERN.test(value) && new Date(value).toISOString() === value
+}
+
 /** `sha256:<hex>` over raw bytes. The one content-hash spelling this tool writes. */
 export function hashContent(bytes) {
   return `sha256:${createHash('sha256').update(bytes).digest('hex')}`
@@ -195,7 +200,7 @@ export function validateEventShape(value, limits = DEFAULT_LIMITS) {
       problems.push(fieldProblem(field, `"action" must be one of ${ACTIONS.join(', ')}`))
       continue
     }
-    if (field === 'recordedAt' && (!TIMESTAMP_PATTERN.test(raw) || new Date(raw).toISOString() !== raw)) {
+    if (field === 'recordedAt' && !isUtcTimestamp(raw)) {
       problems.push(fieldProblem(field, '"recordedAt" must be a UTC timestamp such as 2026-09-13T09:30:00.000Z'))
     }
   }

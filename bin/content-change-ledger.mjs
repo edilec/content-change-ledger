@@ -65,8 +65,10 @@ history filters:
   --owner O           Only events recorded by this owner
   --release ID        Only events in this release
   --action A          Only ${ACTIONS.join(' | ')} events
-  --since TS          Only events recorded at or after this UTC timestamp
-  --until TS          Only events recorded at or before this UTC timestamp
+  --since TS          Only events recorded at or after this UTC timestamp,
+                      spelled 2026-09-13T09:30:00.000Z
+  --until TS          Only events recorded at or before that same timestamp
+                      spelling
   --limit N           Bound on the answer; a cut answer is incomplete (exit 2)
 
 append options:

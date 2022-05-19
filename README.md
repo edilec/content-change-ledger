@@ -68,7 +68,7 @@ content-change-ledger history examples/ledger.jsonl --release 2026.09.1 --json
 | `--owner O` | history | Only events recorded by this owner |
 | `--release ID` | history | Only events in this release |
 | `--action A` | history | Only `create`, `update`, `delete` or `correct` |
-| `--since` / `--until` | history | Bound the answer by `recordedAt` |
+| `--since` / `--until` | history | Bound the answer by `recordedAt`, written `2026-09-13T09:30:00.000Z` |
 | `--limit N` | history | Bound the answer; a cut answer is `incomplete` |
 | `--subject`, `--action`, `--reason`, `--owner`, `--release` | append | Required |
 | `--after HASH` / `--after-file FILE` | append | The content hash after the change |

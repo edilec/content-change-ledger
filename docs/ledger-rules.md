@@ -164,6 +164,11 @@ do not apply to the hash and timestamp fields: those are bounded by their own
 exact formats, so lowering a limit can never make a well-formed event
 unrepresentable.
 
+`--since` and `--until` are refused unless they are written in the one timestamp
+spelling `recordedAt` uses, `YYYY-MM-DDTHH:MM:SS.sssZ`. A window that is a typo
+would otherwise match nothing and report it as a complete, green "no events
+changed".
+
 `timeLimitMs` is measured against an injected clock. The library never reads a
 clock of its own; the command line injects the process monotonic clock, and a
 test injects a fixed one.

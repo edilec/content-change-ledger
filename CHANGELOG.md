@@ -57,6 +57,7 @@ removed from the source:
   raw lines -- is bounded and escaped, not only the evidence field;
 - ordering is by UTF-16 code unit everywhere; `localeCompare` is never used;
 - unknown configuration keys, unknown limits and unknown query filters are
-  refused rather than ignored.
+  refused rather than ignored, and so is a `--since` or `--until` that is not a
+  UTC instant in the one spelling `recordedAt` uses.
 
 No release has been published.

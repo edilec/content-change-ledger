@@ -28,6 +28,7 @@ import {
   eventHash,
   hashContent,
   isControlFree,
+  isUtcTimestamp,
   sanitize,
   serializeEvent,
   validateEventShape,
@@ -58,6 +59,7 @@ export {
   eventHash,
   hashContent,
   isControlFree,
+  isUtcTimestamp,
   parseLedger,
   readLedgers,
   resolveInsideRoot,
@@ -605,14 +607,17 @@ export function assertEvidenceBacked(report) {
 
 const QUERY_KEYS = Object.freeze(['subject', 'owner', 'releaseId', 'action', 'since', 'until', 'limit'])
 
+const TIME_FILTERS = Object.freeze(['since', 'until'])
+
 /**
- * Query the history held in already-parsed events.
+ * Check every filter of a query and resolve the limit it will answer under.
  *
- * The result is a list of copies. Each copy is annotated with `supersededBy`,
- * the ids of later correction events that name it -- computed for the reader,
- * never stored, because annotating a stored event would be rewriting it.
+ * Every filter is validated, not merely the ones that are easy to validate. A
+ * malformed time window is refused here rather than compared as text, because
+ * a window nothing can match would otherwise answer "nothing changed" in the
+ * authoritative green of a complete run.
  */
-export function queryHistory(events, filters = {}, limits = DEFAULT_LIMITS) {
+function resolveQuery(filters, limits) {
   for (const key of Object.keys(filters).sort(byCodeUnit)) {
     if (!QUERY_KEYS.includes(key)) throw new Error(`Unknown query filter "${sanitize(key, 64)}"`)
   }
@@ -624,6 +629,23 @@ export function queryHistory(events, filters = {}, limits = DEFAULT_LIMITS) {
   if (filters.action !== undefined && !ACTIONS.includes(filters.action)) {
     throw new Error(`Query "action" must be one of ${ACTIONS.join(', ')}`)
   }
+  for (const key of TIME_FILTERS) {
+    if (filters[key] !== undefined && !isUtcTimestamp(filters[key])) {
+      throw new Error(`Query "${key}" must be a UTC timestamp such as 2026-09-13T09:30:00.000Z`)
+    }
+  }
+  return limit
+}
+
+/**
+ * Query the history held in already-parsed events.
+ *
+ * The result is a list of copies. Each copy is annotated with `supersededBy`,
+ * the ids of later correction events that name it -- computed for the reader,
+ * never stored, because annotating a stored event would be rewriting it.
+ */
+export function queryHistory(events, filters = {}, limits = DEFAULT_LIMITS) {
+  const limit = resolveQuery(filters, limits)
 
   const corrections = new Map()
   for (const event of events) {

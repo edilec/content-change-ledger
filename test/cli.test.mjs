@@ -207,6 +207,24 @@ test('a history the limit cut short exits 2 and says which limit cut it', async 
   assert.equal(bad.stdout, '')
 })
 
+test('a malformed --since or --until leaves stdout empty and exits 2', async () => {
+  /* Every other filter is validated, and an unvalidated one is worse than a
+     rejected one: it answers "nothing changed" with the authority of a
+     complete run. */
+  for (const flag of ['--since', '--until']) {
+    for (const value of ['garbage', '2026-13-45', '2026-09-02', '2026-09-02T00:00:00Z']) {
+      const result = await cli(['history', 'examples/ledger.jsonl', flag, value, '--json'])
+      assert.equal(result.code, 2, `${flag} ${value} did not exit 2`)
+      assert.equal(result.stdout, '', `${flag} ${value} wrote a report`)
+      assert.match(result.stderr, new RegExp(`Query "${flag.slice(2)}" must be a UTC timestamp`))
+    }
+  }
+
+  const windowed = await cli(['history', 'examples/ledger.jsonl', '--since', '2026-09-04T00:00:00.000Z', '--json'])
+  assert.equal(windowed.code, 0)
+  assert.equal(JSON.parse(windowed.stdout).entries.length, 3)
+})
+
 test('the documented time budget is wired through the command line', async () => {
   await withDirectory(async (directory) => {
     /* The bug this guards against is a limit that the library enforces and the
