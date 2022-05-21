@@ -133,8 +133,14 @@ straight into a parser. Diagnostics always go to stderr.
 
 `history --json` returns the same envelope with an `entries` array. Each entry
 is a copy of the stored event plus `supersededBy`, the ids of later corrections
-that name it. That annotation is computed for the reader and is never written
-into the file.
+that name it, and the ledger `file` it came from. That annotation is computed
+for the reader and is never written into the file.
+
+Every untrusted string in either output -- an id, a path, a message, an excerpt
+-- is bounded and escaped: control characters (C0, DEL and C1, which is where
+U+0085 hides), the line separators U+2028 and U+2029, and the bidirectional
+overrides are written as `\uXXXX` escape text. A crafted id or file name cannot
+forge a line in the human report or reverse what it says.
 
 ## Exit codes
 

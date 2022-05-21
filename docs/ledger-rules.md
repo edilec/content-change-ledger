@@ -30,7 +30,15 @@ Each event is a flat object with exactly these twelve keys, in this order:
 Every value is a string or `null`. There is no nesting, so there is no recursion
 to bound: a nested object or an array in any field is rejected, not flattened.
 Content hashes are written `sha256:` followed by 64 lowercase hex digits. A
-control character, DEL, U+2028 or U+2029 in any field is rejected.
+control character -- C0 (U+0000-U+001F), DEL (U+007F) or C1 (U+0080-U+009F,
+which includes U+0085 NEL and the 8-bit CSI U+009B) -- and the line and
+paragraph separators U+2028 and U+2029 are rejected in any field, because each
+of them ends or forges a line somewhere.
+
+The bidirectional formatting characters are not rejected: they are real content
+in right-to-left text. They are stored exactly as given and escaped wherever
+this tool prints them, which is described under [What reaches the
+report](#what-reaches-the-report).
 
 ### The hash
 
@@ -125,6 +133,26 @@ These rules also hold:
   nothing.
 - An input that was not read is a finding naming the file, never a skipped
   input.
+
+## What reaches the report
+
+Every untrusted string is bounded and escaped on its way into output -- ids,
+keys, paths, messages, evidence, the entries of a history, and the diagnostics
+on stderr, not only the excerpt of a bad line. Escaped means written as `\uXXXX`
+escape text, and it covers:
+
+| Class | Range | Why |
+| :---------------- | :---------------------------------- | :--------------- |
+| C0 | U+0000-U+001F | ends a line in any consumer |
+| DEL | U+007F | control character |
+| C1 | U+0080-U+009F | U+0085 is a line break, U+009B starts a terminal escape |
+| line, paragraph | U+2028, U+2029 | ends a line for a JavaScript consumer |
+| bidi | U+200E, U+200F, U+202A-U+202E, U+2066-U+2069 | reverses or hides displayed text |
+
+The bound is 200 characters for a path, 120 for an excerpt, and shorter for a
+quoted field; a bounded string ends in ` [...]`. A ledger file name is as
+untrusted as a ledger's contents, so it is escaped in the human report, in the
+`location.file` of every finding, and in the `file` of every history entry.
 
 ## Configuration
 

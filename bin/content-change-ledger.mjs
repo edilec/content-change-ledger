@@ -257,7 +257,9 @@ async function main(argv) {
     return await runAppend(options)
   } catch (error) {
     const detail = error instanceof LimitExceeded ? `limit exceeded: ${error.message}` : error.message
-    process.stderr.write(`${detail}\n`)
+    /* A diagnostic quotes paths and values the caller supplied, so it is
+       escaped exactly like the report is: one line, no forged second one. */
+    process.stderr.write(`${sanitize(detail, 400)}\n`)
     return 2
   }
 }

@@ -55,8 +55,12 @@ removed from the source:
 - path confinement resolves the real path of both the target and the root, so a
   symlink planted inside the root cannot escape it and a legitimate file reached
   through a symlinked root is not falsely refused;
-- every untrusted string that reaches output -- ids, subjects, owners, paths and
-  raw lines -- is bounded and escaped, not only the evidence field;
+- every untrusted string that reaches output -- ids, keys, paths, messages,
+  history entries, raw lines and the diagnostics on stderr -- is bounded and
+  escaped, not only the evidence field. The escaped set is C0, DEL, C1
+  (U+0085 and U+009B among them), U+2028, U+2029 and the bidi controls
+  U+200E, U+200F, U+202A-U+202E and U+2066-U+2069, each tested through a real
+  run and through an identifier as well as an excerpt;
 - ordering is by UTF-16 code unit everywhere; `localeCompare` is never used;
 - unknown configuration keys, unknown limits and unknown query filters are
   refused rather than ignored, and so is a `--since` or `--until` that is not a

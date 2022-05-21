@@ -63,36 +63,71 @@ export function byCodeUnit(left, right) {
   return left < right ? -1 : 1
 }
 
-function isForbiddenCodePoint(code) {
-  return code < 0x20 || code === 0x7f || code === 0x2028 || code === 0x2029
+/**
+ * A character no field may carry: it would end or forge a line somewhere.
+ *
+ * C0 and DEL are the obvious ones. C1 is the range that is easy to forget and
+ * just as dangerous: U+0085 is NEL, a line break to a terminal and to several
+ * text readers, and U+009B is the 8-bit CSI that starts a terminal escape
+ * sequence. U+2028 and U+2029 end a line for a JavaScript parser.
+ */
+function isControlCodePoint(code) {
+  return code < 0x20
+    || code === 0x7f
+    || (code >= 0x80 && code <= 0x9f)
+    || code === 0x2028
+    || code === 0x2029
 }
 
-/** True when a string carries no control character, DEL, or line separator. */
+/**
+ * Everything above, plus the bidirectional formatting characters.
+ *
+ * U+202E (RIGHT-TO-LEFT OVERRIDE) and its relatives do not end a line; they
+ * reverse or hide what is displayed after them, which is how a crafted id makes
+ * a report read as something other than what it says. They are legitimate
+ * content in right-to-left text, so they are accepted inside a field and
+ * escaped on the way out rather than refused on the way in.
+ */
+function isUnsafeInOutput(code) {
+  return isControlCodePoint(code)
+    || code === 0x200e
+    || code === 0x200f
+    || (code >= 0x202a && code <= 0x202e)
+    || (code >= 0x2066 && code <= 0x2069)
+}
+
+/** True when a string carries no control character, DEL, C1, or line separator. */
 export function isControlFree(text) {
   for (const character of text) {
-    if (isForbiddenCodePoint(character.codePointAt(0))) return false
+    if (isControlCodePoint(character.codePointAt(0))) return false
   }
   return true
+}
+
+/** Write every unsafe character as its own escape text, leaving the rest exactly as it is. */
+function escapeUnsafe(characters) {
+  let out = ''
+  for (const character of characters) {
+    const code = character.codePointAt(0)
+    out += isUnsafeInOutput(code) ? `\\u${code.toString(16).padStart(4, '0')}` : character
+  }
+  return out
 }
 
 /**
  * Bound and escape an untrusted string on its way into output.
  *
- * Every untrusted string reaches the report through this function -- ids,
- * subjects, owners, release ids, paths, raw lines -- not only the evidence
- * field. An id carrying a newline must not be able to forge an extra line in
- * the human report, and a line separator must not split a JSON value in a
- * consumer that treats U+2028 as a break.
+ * Every untrusted string reaches the report through this function -- ids, keys,
+ * paths, messages, raw lines -- not only the evidence field. An id carrying a
+ * newline or a NEL must not be able to forge an extra line in the human report,
+ * a line separator must not split a JSON value in a consumer that treats U+2028
+ * as a break, and a right-to-left override must not reverse the text a reader
+ * sees.
  */
 export function sanitize(text, max = 120) {
   const characters = Array.from(String(text))
   const bounded = characters.length > max ? [...characters.slice(0, max), ' [...]'] : characters
-  let out = ''
-  for (const character of bounded) {
-    const code = character.codePointAt(0)
-    out += isForbiddenCodePoint(code) ? `\\u${code.toString(16).padStart(4, '0')}` : character
-  }
-  return out
+  return escapeUnsafe(bounded)
 }
 
 /** True when a string is a UTC instant in the one spelling this tool accepts. */
@@ -126,13 +161,16 @@ export function eventHash(event) {
 /**
  * One event as one line of the ledger file.
  *
- * U+2028 and U+2029 are written as escape text. Field validation already
- * refuses them, so this is the second of two defences rather than the only one.
+ * `JSON.stringify` escapes C0 and DEL, and every other character this tool
+ * refuses to display raw -- C1, the line separators and the bidi controls -- is
+ * written as escape text here. Field validation already refuses the control
+ * characters, so this is the second of two defences rather than the only one,
+ * and an escape is the same string to any JSON reader.
  */
 export function serializeEvent(event) {
   const ordered = {}
   for (const key of EVENT_KEYS) ordered[key] = event[key] ?? null
-  return JSON.stringify(ordered).replaceAll('\u2028', '\\u2028').replaceAll('\u2029', '\\u2029')
+  return escapeUnsafe(JSON.stringify(ordered))
 }
 
 function fieldProblem(field, detail) {
