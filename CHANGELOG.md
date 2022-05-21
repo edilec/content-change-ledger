@@ -18,8 +18,10 @@ All notable changes to this project are documented in this file.
 - verification of duplicate event ids, self-recorded hashes, chain continuity,
   the genesis event, per-subject before/after continuity, the subject state
   machine, correction targets, and an optional head checkpoint;
-- `history` queries by subject, owner, release, action and time window, where an
-  answer cut short by its limit is `incomplete` rather than quietly short;
+- `history` queries by subject, owner, release, action and time window, where
+  every filter is validated -- a malformed window is refused, not answered --
+  and an answer cut short by the limit on the whole answer is `incomplete`
+  rather than quietly short;
 - explicit bounds on files, bytes, events, event size, field length, query
   results and wall-clock time, each reported as `incomplete` with a finding
   naming the limit;

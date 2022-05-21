@@ -676,17 +676,21 @@ export function queryHistory(events, filters = {}, limits = DEFAULT_LIMITS) {
 }
 
 /**
- * Query one loaded ledger and report the result.
+ * Query the loaded ledgers and report one answer.
  *
  * A query over a ledger that could not be read in full is `incomplete`, and so
  * is a result the limit cut short: an answer that silently omits events is how
- * a history comes to look complete when it is not.
+ * a history comes to look complete when it is not. The limit bounds the answer,
+ * not each ledger separately, because a caller that asked for at most N events
+ * asked about the answer it is given.
  */
 export function historyReport(ledgers, filters = {}, options = {}) {
   const config = options.config ?? EMPTY_CONFIG
   const limits = { ...config.limits, ...(options.limits ?? {}) }
   const failures = options.failures ?? []
   const state = { findings: [], incomplete: false, checked: 0, corrections: 0, subjects: 0, previousLine: 0 }
+  const limit = resolveQuery(filters, limits)
+  const answers = []
   const entries = []
 
   for (const failure of failures) {
@@ -739,17 +743,32 @@ export function historyReport(ledgers, filters = {}, options = {}) {
       ))
     }
 
-    const result = queryHistory(events, filters, limits)
-    for (const entry of result.entries) entries.push({ file: ledger.file, ...entry })
-    if (result.truncated) {
-      state.incomplete = true
-      state.findings.push(finding(
-        'history-truncated',
-        `${result.matched} event(s) match this query but the limit of ${result.limit} cut the answer short.`,
-        { file: ledger.file, pointer: '/ledger', line: 1 },
-        { suggestion: 'Raise --limit, or narrow the query.' },
-      ))
+    answers.push({ file: ledger.file, result: queryHistory(events, filters, limits) })
+  }
+
+  /* The limit is spent across the whole answer, in the order the ledgers were
+     named, and what it cut off is reported once. Spending it per ledger would
+     return N times the bound and call the result complete. */
+  let matched = 0
+  let cutAt = null
+  for (const answer of answers) {
+    matched += answer.result.matched
+    let taken = 0
+    for (const entry of answer.result.entries) {
+      if (entries.length >= limit) break
+      entries.push({ file: sanitize(answer.file, 200), ...entry })
+      taken += 1
     }
+    if (cutAt === null && taken < answer.result.matched) cutAt = answer.file
+  }
+  if (matched > entries.length) {
+    state.incomplete = true
+    state.findings.push(finding(
+      'history-truncated',
+      `${matched} event(s) match this query but the limit of ${limit} cut the answer short.`,
+      { file: cutAt, pointer: '/ledger', line: 1 },
+      { suggestion: 'Raise --limit, or narrow the query.' },
+    ))
   }
 
   const report = buildReport(state, {

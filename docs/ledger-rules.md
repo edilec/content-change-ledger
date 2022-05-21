@@ -164,6 +164,11 @@ do not apply to the hash and timestamp fields: those are bounded by their own
 exact formats, so lowering a limit can never make a well-formed event
 unrepresentable.
 
+`maxQueryResults` and `--limit` bound the whole answer, not each ledger of it:
+querying several ledgers at once returns at most that many events in total, and
+an answer the bound cut short is `incomplete` with a `history-truncated`
+finding.
+
 `--since` and `--until` are refused unless they are written in the one timestamp
 spelling `recordedAt` uses, `YYYY-MM-DDTHH:MM:SS.sssZ`. A window that is a typo
 would otherwise match nothing and report it as a complete, green "no events

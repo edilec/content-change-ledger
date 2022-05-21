@@ -311,6 +311,41 @@ test('a malformed time window is refused, never answered with an authoritative n
   })
 })
 
+test('the limit bounds the answer, not each ledger separately', async () => {
+  await withDirectory(async (directory) => {
+    const { options } = await seed(directory)
+    const { ledgers } = await readLedgers(['ledger.jsonl'], options)
+    const both = [{ ...ledgers[0], file: 'a.jsonl' }, { ...ledgers[0], file: 'b.jsonl' }]
+
+    /* Six matching events across two ledgers. A limit spent per ledger returns
+       twice the bound and calls it complete, which is how a query that omitted
+       half the history comes to look like the whole of it. */
+    const cut = historyReport(both, { limit: 4 })
+    assert.equal(cut.entries.length, 4)
+    assert.equal(cut.summary.matched, 4)
+    assert.equal(cut.status, 'incomplete')
+    assert.deepEqual(cut.entries.map((entry) => `${entry.file}:${entry.id}`), [
+      'a.jsonl:evt-0001', 'a.jsonl:evt-0002', 'a.jsonl:evt-0003', 'b.jsonl:evt-0001',
+    ])
+    const truncation = cut.findings.filter((item) => item.ruleId === 'history-truncated')
+    assert.equal(truncation.length, 1)
+    assert.match(truncation[0].message, /6 event\(s\) match this query but the limit of 4/)
+    assert.equal(truncation[0].location.file, 'b.jsonl')
+
+    const whole = historyReport(both, { limit: 6 })
+    assert.equal(whole.entries.length, 6)
+    assert.equal(whole.status, 'pass')
+    assert.deepEqual(whole.findings, [])
+
+    /* The declared maximum bounds the answer the same way when no --limit is given. */
+    const bounded = historyReport(both, {}, { limits: { ...DEFAULT_LIMITS, maxQueryResults: 2 } })
+    assert.equal(bounded.entries.length, 2)
+    assert.equal(bounded.status, 'incomplete')
+    assert.match(bounded.findings.find((item) => item.ruleId === 'history-truncated').message,
+      /6 event\(s\) match this query but the limit of 2/)
+  })
+})
+
 test('a query over a ledger it could not read in full says so', async () => {
   await withDirectory(async (directory) => {
     const { path, options } = await seed(directory)
