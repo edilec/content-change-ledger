@@ -61,7 +61,10 @@ removed from the source:
   (U+0085 and U+009B among them), U+2028, U+2029 and the bidi controls
   U+200E, U+200F, U+202A-U+202E and U+2066-U+2069, each tested through a real
   run and through an identifier as well as an excerpt;
-- ordering is by UTF-16 code unit everywhere; `localeCompare` is never used;
+- ordering is by UTF-16 code unit, pinned by the exact list each entry point
+  emits for inputs that collation orders differently -- `Z` before `a`, `README`
+  before `assets`, `MAXB` before `MAX_A`, `a-b` before `a_b`. Substituting a
+  collator for `byCodeUnit` fails those tests rather than passing a source scan;
 - unknown configuration keys, unknown limits and unknown query filters are
   refused rather than ignored, and so is a `--since` or `--until` that is not a
   UTC instant in the one spelling `recordedAt` uses.
