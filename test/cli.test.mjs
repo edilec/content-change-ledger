@@ -225,6 +225,21 @@ test('a malformed --since or --until leaves stdout empty and exits 2', async () 
   assert.equal(JSON.parse(windowed.stdout).entries.length, 3)
 })
 
+test('a history over an input that could not be read still reports which one, and exits 2', async () => {
+  const missing = await cli(['history', 'absent.jsonl', '--json'])
+  assert.equal(missing.code, 2)
+  const report = JSON.parse(missing.stdout)
+  assert.equal(report.status, 'incomplete')
+  assert.deepEqual(report.findings.map((item) => item.ruleId), ['ledger-unreadable'])
+  assert.equal(report.findings[0].location.file, 'absent.jsonl')
+  assert.deepEqual(report.entries, [])
+
+  const human = await cli(['history', 'absent.jsonl'])
+  assert.equal(human.code, 2)
+  assert.match(human.stdout, /absent.jsonl:1 error   ledger-unreadable/)
+  assert.match(human.stdout, /status incomplete/)
+})
+
 test('the documented time budget is wired through the command line', async () => {
   await withDirectory(async (directory) => {
     /* The bug this guards against is a limit that the library enforces and the

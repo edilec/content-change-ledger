@@ -41,7 +41,9 @@ removed from the source:
   correction-target check and the chain link across the gap all stop reporting,
   and the run is `incomplete`;
 - `pass` with `checked: 0` cannot be emitted: an empty ledger is `ledger-empty`
-  and `incomplete`, and the report builder refuses a pass that verified nothing;
+  and `incomplete`, and the report builder refuses a pass that verified nothing.
+  Every rule that was observed to make a real run `incomplete` is also refused on
+  a report that is not, so a rule quietly dropped from that list fails a test;
 - severity comes from one frozen `ruleId -> severity` table, and what each rule
   does to a run is pinned by a real run: every rule in the catalog has a fixture
   driven through the command line, asserting the exit code, the status and the
@@ -67,6 +69,9 @@ removed from the source:
   collator for `byCodeUnit` fails those tests rather than passing a source scan;
 - unknown configuration keys, unknown limits and unknown query filters are
   refused rather than ignored, and so is a `--since` or `--until` that is not a
-  UTC instant in the one spelling `recordedAt` uses.
+  UTC instant in the one spelling `recordedAt` uses;
+- an input that could not be read still produces a report naming it, for
+  `history` as well as `verify`: exit 2 carries the report, and only a usage or
+  configuration error leaves stdout empty.
 
 No release has been published.

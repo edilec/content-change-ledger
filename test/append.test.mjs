@@ -346,6 +346,34 @@ test('the limit bounds the answer, not each ledger separately', async () => {
   })
 })
 
+test('a history that could not read an input, or stopped at a bound, says so in the report', async () => {
+  await withDirectory(async (directory) => {
+    const { options } = await seed(directory)
+    const { ledgers } = await readLedgers(['ledger.jsonl'], options)
+
+    /* The exit-2 report contract: a named input that could not be read still
+       produces a report, because a consumer needs to know WHICH one. */
+    const failures = [{ file: 'absent.jsonl', ruleId: 'ledger-unreadable', message: 'this ledger could not be read: ENOENT' }]
+    const unread = historyReport(ledgers, {}, { failures })
+    assert.equal(unread.status, 'incomplete')
+    const unreadable = unread.findings.find((item) => item.ruleId === 'ledger-unreadable')
+    assert.equal(unreadable.location.file, 'absent.jsonl')
+    assert.match(unreadable.message, /This input was not read: this ledger could not be read/)
+    assert.equal(unread.summary.files, 2)
+    assert.equal(unread.summary.filesRead, 1)
+    assert.deepEqual(unread.entries.map((entry) => entry.id), ['evt-0001', 'evt-0002', 'evt-0003'])
+
+    /* And a ledger the event bound cut short: the entries it did read are
+       returned, and the report is incomplete rather than a short pass. */
+    const stopped = historyReport(ledgers, {}, { limits: { ...DEFAULT_LIMITS, maxEvents: 2 } })
+    assert.equal(stopped.status, 'incomplete')
+    assert.deepEqual(stopped.entries.map((entry) => entry.id), ['evt-0001', 'evt-0002'])
+    const limit = stopped.findings.find((item) => item.ruleId === 'limit-exceeded')
+    assert.match(limit.message, /The maxEvents limit of 2 was exceeded \(observed 3\); this history stops early/)
+    assert.equal(limit.location.file, 'ledger.jsonl')
+  })
+})
+
 test('a query over a ledger it could not read in full says so', async () => {
   await withDirectory(async (directory) => {
     const { path, options } = await seed(directory)
