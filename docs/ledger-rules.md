@@ -173,8 +173,13 @@ them.
 
 ## Limits
 
-Every bound is enforced, and exceeding one is a `limit-exceeded` finding with
-status `incomplete` -- never a silent truncation, and never a pass.
+Every bound on evidence is enforced, and exceeding one is a `limit-exceeded`
+finding with status `incomplete` -- never a silent truncation, and never a pass.
+
+`maxFiles` is the exception, because it bounds the invocation rather than the
+evidence: naming more ledgers than it allows is refused before anything is read,
+so there is no run to report on. That is a usage error -- exit 2, empty stdout,
+and the limit named on stderr -- exactly like an unknown option.
 
 | Limit | Default | What it bounds |
 | :---------------- | ------: | :------------------------------------------ |

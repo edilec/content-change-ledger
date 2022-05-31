@@ -169,8 +169,10 @@ one. A consumer that pipes stdout must handle both.
   It proves nothing against a writer who rebuilds the ledger from the first line.
   There are no signatures and no external anchor.
 - **The timestamps are claims, not evidence.** `recordedAt` is whatever the
-  caller supplied. The tool never reads a clock of its own and cannot tell you
-  when anything really happened.
+  caller supplied, and nothing corroborates it. The library never reads a clock:
+  the command line is the only part of the tool that does, and only to default
+  `--recorded-at` to this process's wall clock, which is a claim by the machine
+  that ran the append and nothing more.
 - **The content hashes are claims too.** `verify` checks the ledger against
   itself; it does not open your content files and re-hash them, so it cannot
   tell you whether `content/pricing.md` still matches the last `afterHash`
@@ -189,7 +191,10 @@ one. A consumer that pipes stdout must handle both.
   and unverified is never a pass.
 - **It is a file, not a database.** Every verb reads the whole ledger; the bounds
   in [docs/ledger-rules.md](./docs/ledger-rules.md) say how far that goes before
-  the run reports `incomplete` instead of truncating.
+  the run reports `incomplete` instead of truncating. The one bound that is not
+  a finding is `maxFiles`: naming more ledgers than it allows is refused before
+  any of them is read, so it is a usage error with empty stdout rather than a
+  report.
 
 ## License
 

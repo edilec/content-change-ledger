@@ -22,9 +22,10 @@ All notable changes to this project are documented in this file.
   every filter is validated -- a malformed window is refused, not answered --
   and an answer cut short by the limit on the whole answer is `incomplete`
   rather than quietly short;
-- explicit bounds on files, bytes, events, event size, field length, query
-  results and wall-clock time, each reported as `incomplete` with a finding
-  naming the limit;
+- explicit bounds on bytes, events, event size, field length, query results and
+  wall-clock time, each reported as `incomplete` with a finding naming the
+  limit, plus `maxFiles`, which bounds the invocation and is refused as a usage
+  error before any evidence is read;
 - a CLI with `verify`, `history`, `append`, `--root`, `--json` and exit codes
   0 / 1 / 2;
 - a clean example ledger with a policy file, and a deliberately tampered one;

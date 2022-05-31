@@ -240,6 +240,23 @@ test('a history over an input that could not be read still reports which one, an
   assert.match(human.stdout, /status incomplete/)
 })
 
+test('more ledger paths than maxFiles is a usage error: no report, empty stdout, exit 2', async () => {
+  /* The one bound that is not a finding, because it is reached before any
+     evidence is read: there is no run to report on. docs/ledger-rules.md says
+     so, and this is what it looks like. */
+  const many = new Array(65).fill('examples/ledger.jsonl')
+  const result = await cli(['verify', ...many, '--json'])
+  assert.equal(result.code, 2)
+  assert.equal(result.stdout, '')
+  assert.match(result.stderr, /limit exceeded: the maxFiles limit of 64 was exceeded \(observed 65\)/)
+
+  /* One under the bound is read normally, so the refusal is the limit and not
+     a wrong comparison. */
+  const allowed = await cli(['verify', ...new Array(64).fill('examples/ledger.jsonl'), '--json'])
+  assert.equal(allowed.code, 0)
+  assert.equal(JSON.parse(allowed.stdout).summary.files, 64)
+})
+
 test('the documented time budget is wired through the command line', async () => {
   await withDirectory(async (directory) => {
     /* The bug this guards against is a limit that the library enforces and the
@@ -256,6 +273,29 @@ test('the documented time budget is wired through the command line', async () =>
     const limit = report.findings.find((item) => item.ruleId === 'limit-exceeded')
     assert.match(limit.message, /timeLimitMs limit of 1 was exceeded/)
     assert.ok(report.summary.checked < 5_000, 'the run claimed to have read past the budget')
+  })
+})
+
+test('the one clock in the tool is the command line default for --recorded-at', async () => {
+  await withDirectory(async (directory) => {
+    /* The library refuses a draft without recordedAt; the command line is the
+       only part of this tool that reads a clock, and the README says so. */
+    const dated = APPEND.slice(0, APPEND.indexOf('--recorded-at'))
+    const result = await cli([...dated, '--root', directory], directory)
+    assert.equal(result.code, 0)
+    const { recordedAt } = JSON.parse(result.stdout)
+    assert.equal(new Date(recordedAt).toISOString(), recordedAt, 'the default was not a UTC instant')
+    assert.ok(Math.abs(Date.parse(recordedAt) - Date.now()) < 120_000,
+      `the default recordedAt ${recordedAt} did not come from this machine's clock`)
+
+    /* And a supplied one is taken exactly, so the claim is the caller's. */
+    const supplied = await cli([
+      'append', 'ledger.jsonl', '--subject', 'install.md', '--action', 'create',
+      '--reason', 'install page added', '--owner', 'docs-team', '--release', '2026.09.1',
+      '--after', `sha256:${'2'.repeat(64)}`, '--recorded-at', '2026-09-01T09:00:00.000Z', '--root', directory,
+    ], directory)
+    assert.equal(supplied.code, 0, supplied.stderr)
+    assert.equal(JSON.parse(supplied.stdout).recordedAt, '2026-09-01T09:00:00.000Z')
   })
 })
 
