@@ -7,7 +7,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "lint": "node --check src/event.mjs && node --check src/ledger.mjs && node --check src/index.mjs && node --check bin/content-change-ledger.mjs && node --check test/event.test.mjs && node --check test/verify.test.mjs && node --check test/append.test.mjs && node --check test/cli.test.mjs && node --check test/severity.test.mjs && node --check test/ordering.test.mjs && node --check test/output-safety.test.mjs",
+    "lint": "node --check src/event.mjs && node --check src/ledger.mjs && node --check src/index.mjs && node --check bin/content-change-ledger.mjs && node --check test/event.test.mjs && node --check test/verify.test.mjs && node --check test/append.test.mjs && node --check test/cli.test.mjs && node --check test/severity.test.mjs && node --check test/ordering.test.mjs && node --check test/output-safety.test.mjs && node --check test/parse-failure.test.mjs",
     "test": "node --test",
     "test:coverage": "node --test --experimental-test-coverage --test-coverage-include=src/**",
     "example": "node bin/content-change-ledger.mjs verify examples/ledger.jsonl --config examples/ledger-policy.json",

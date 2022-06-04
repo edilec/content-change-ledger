@@ -24,6 +24,7 @@ import {
   hashContent,
   historyReport,
   parseConfig,
+  parseFailureDetail,
   readLedgers,
   resolveInsideRoot,
   sanitize,
@@ -155,7 +156,7 @@ async function loadConfig(path) {
   try {
     parsed = JSON.parse(text)
   } catch (error) {
-    throw new Error(`Configuration is not valid JSON: ${error.message}`)
+    throw new Error(`Configuration is not valid JSON: ${parseFailureDetail(error)}`)
   }
   return parseConfig(parsed)
 }

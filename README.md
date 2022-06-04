@@ -142,6 +142,13 @@ U+0085 hides), the line separators U+2028 and U+2029, and the bidirectional
 overrides are written as `\uXXXX` escape text. A crafted id or file name cannot
 forge a line in the human report or reverse what it says.
 
+A line or a configuration file that does not parse is reported by position,
+line and column -- never by quoting it back. `JSON.parse` embeds the input in
+one of its two error messages, so a file short enough to be only a credential
+would otherwise be reproduced in full by its own failure, and escaping would
+not stop it: the quotation sits at the front of the message while the bound
+cuts from the back.
+
 ## Exit codes
 
 | Code | Meaning |

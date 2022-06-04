@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Fixed
+
+- a ledger line or a `--config` file that does not parse is no longer quoted
+  back. `JSON.parse` embeds the input in one of its two error messages
+  (`Unexpected token 'A', "AKIA..." is not valid JSON`), so a file short enough
+  to be only a credential was reproduced in full by the `event-not-json`
+  finding on stdout and by `Configuration is not valid JSON:` on stderr. Worse
+  for a long line: V8 quotes a window around the offending character wherever
+  it sits, so the message could show bytes from past the 120-character bound
+  the `evidence` excerpt stops at. `parseFailureDetail` in `src/event.mjs` now
+  keeps the position, line and column and drops the quotation;
+
 ### Added
 
 - an append-only JSON Lines ledger of content change events: each event records

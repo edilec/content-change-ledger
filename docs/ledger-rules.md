@@ -154,6 +154,17 @@ quoted field; a bounded string ends in ` [...]`. A ledger file name is as
 untrusted as a ledger's contents, so it is escaped in the human report, in the
 `location.file` of every finding, and in the `file` of every history entry.
 
+A parse failure is reported by position, never by quotation. `JSON.parse` has
+two error messages and one of them embeds the input --
+`Unexpected token 'A', "AKIA..." is not valid JSON` for a short document, and a
+ten-character window around the offending character for a long one. A ledger
+line or a configuration file that is only a credential would otherwise be
+reproduced by its own error message, and a window drawn deep inside a long line
+would show bytes the 120-character excerpt bound deliberately stops short of.
+Escaping and bounding do not remove it: the quoted span is at the front of the
+message and the bound cuts from the back. So `parseFailureDetail` keeps the
+position, line and column and drops the quotation.
+
 ## Configuration
 
 `--config FILE` takes a JSON object. Unknown keys are refused, so a typo can

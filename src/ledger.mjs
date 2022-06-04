@@ -10,7 +10,7 @@
 import { appendFile, readFile, realpath, stat } from 'node:fs/promises'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 
-import { DEFAULT_LIMITS, validateEventShape } from './event.mjs'
+import { DEFAULT_LIMITS, parseFailureDetail, validateEventShape } from './event.mjs'
 
 /** A declared bound was reached. Always an explicit finding, never a silent truncation. */
 export class LimitExceeded extends Error {
@@ -214,7 +214,7 @@ export function parseLedger(text, options = {}) {
         index: records.length,
         raw,
         event: null,
-        problems: [{ kind: 'not-json', field: null, detail: `this line is not JSON: ${error.message}` }],
+        problems: [{ kind: 'not-json', field: null, detail: `this line is not JSON: ${parseFailureDetail(error)}` }],
       })
       continue
     }

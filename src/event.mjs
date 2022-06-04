@@ -130,6 +130,40 @@ export function sanitize(text, max = 120) {
   return escapeUnsafe(bounded)
 }
 
+/**
+ * The part of a `JSON.parse` failure that may safely be repeated.
+ *
+ * V8 reports a parse failure two ways, and one of them quotes the input:
+ * `Unexpected token 'A', "AKIAIOSFODNN7EXAMPLE" is not valid JSON`. A ledger
+ * line -- or a configuration file -- short enough to be only a credential is
+ * therefore reproduced in full by its own error message, and a longer one is
+ * reproduced ten characters at a time, in a window around the offending
+ * character. That window is drawn from wherever the error is, so it can show
+ * bytes from past the 120-character bound `sanitize` applies to evidence.
+ *
+ * `sanitize` does not help on its own: it escapes control characters and cuts
+ * from the *end*, while the quoted span sits at the front of the message.
+ *
+ * The quoted form carries no position, so nothing diagnostic is lost by
+ * reducing it to the offending token. The other form is all position and no
+ * input, and is kept. The quoted window never leaves this function.
+ *
+ * The quoted form is matched first on purpose: a line whose own bytes read
+ * `at position 12` would otherwise be sliced after its own quoted copy.
+ */
+export function parseFailureDetail(error) {
+  const message = typeof error?.message === 'string' ? error.message : ''
+  const token = /^Unexpected token (.+?), (\.\.\.)?".*"(?:\.\.\.)? is not valid JSON$/s.exec(message)
+  if (token) {
+    const where = token[2] === undefined ? ' near the start' : ''
+    return `unexpected token ${sanitize(token[1], 8)}${where}`
+  }
+  const position = /at position \d+(?: \(line \d+ column \d+\))?/.exec(message)
+  if (position) return message.slice(0, position.index + position[0].length)
+  if (/^Unexpected end of JSON input$/.test(message)) return message
+  return 'it could not be parsed as JSON'
+}
+
 /** True when a string is a UTC instant in the one spelling this tool accepts. */
 export function isUtcTimestamp(value) {
   return typeof value === 'string' && TIMESTAMP_PATTERN.test(value) && new Date(value).toISOString() === value
