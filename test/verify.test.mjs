@@ -283,6 +283,8 @@ test('the head checkpoint is what detects a truncated tail', () => {
   const truncated = run(textOf(events.slice(0, 3)), { config: parseConfig(head) })
   assert.deepEqual(ruleIds(truncated), ['checkpoint-mismatch@3'])
   assert.equal(truncated.status, 'fail')
+  assert.equal(truncated.findings[0].evidence,
+    `head evt-0003 ${events[2].hash}, expected evt-0004 ${events[3].hash}`)
 
   /* Without the checkpoint the same truncation is invisible, and the report
      says so rather than implying the tail was checked. */
@@ -290,6 +292,39 @@ test('the head checkpoint is what detects a truncated tail', () => {
   assert.deepEqual(ruleIds(unanchored), ['tail-not-anchored@1'])
   assert.equal(unanchored.status, 'pass')
   assert.equal(unanchored.findings[0].severity, 'info')
+})
+
+test('a matching long head id passes without a checkpoint finding', () => {
+  const event = createEvent({ ...DRAFTS[0], id: `${'A'.repeat(65)}X` })
+  const config = parseConfig({ schemaVersion: '1', head: { id: event.id, hash: event.hash } })
+  const report = run(textOf([event]), { config })
+
+  assert.equal(report.status, 'pass')
+  assert.deepEqual(report.findings, [])
+})
+
+test('a checkpoint mismatch identifies a differing UTF-16 unit beyond the displayed id', () => {
+  const event = createEvent({ ...DRAFTS[0], id: `${'A'.repeat(65)}X` })
+  const config = parseConfig({ schemaVersion: '1', head: { id: `${'A'.repeat(65)}Y`, hash: event.hash } })
+  const report = run(textOf([event]), { config })
+
+  assert.equal(report.status, 'fail')
+  const mismatch = report.findings.find((item) => item.ruleId === 'checkpoint-mismatch')
+  assert.ok(mismatch)
+  assert.match(mismatch.evidence, /first differing UTF-16 unit at offset 65: U\+0058 vs U\+0059/)
+  assert.equal(mismatch.evidence.includes(event.id), false)
+  assert.equal(mismatch.evidence.includes(config.head.id), false)
+})
+
+test('a checkpoint mismatch identifies a hidden id extension without exposing it', () => {
+  const event = createEvent({ ...DRAFTS[0], id: `${'A'.repeat(65)}X` })
+  const config = parseConfig({ schemaVersion: '1', head: { id: `${event.id}Q`, hash: event.hash } })
+  const report = run(textOf([event]), { config })
+
+  assert.equal(report.status, 'fail')
+  const mismatch = report.findings.find((item) => item.ruleId === 'checkpoint-mismatch')
+  assert.match(mismatch.evidence, /first differing UTF-16 unit at offset 66: end of id vs U\+0051/)
+  assert.equal(mismatch.evidence.includes(config.head.id), false)
 })
 
 test('a checkpoint is not claimed when the tail was never read', () => {
