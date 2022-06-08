@@ -182,7 +182,9 @@ test('a ledger path is escaped in the human report, in verify --json and in hist
     /* And the path in an entry is bounded like every other untrusted string. */
     const long = 'p'.repeat(400)
     const entry = historyReport([{ file: long, text: `${serializeEvent(first)}${NEWLINE}` }], {}).entries[0]
-    assert.equal(entry.file, `${'p'.repeat(200)} [...]`)
+    assert.ok(entry.file.startsWith('p'.repeat(90)))
+    assert.ok(entry.file.length <= 200)
+    assert.match(entry.file, /utf16len:400,sha256:[0-9a-f]{64}/u)
   })
 })
 

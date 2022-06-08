@@ -16,6 +16,7 @@
  * never orders anything by locale.
  */
 
+import { createHash } from 'node:crypto'
 import {
   ACTIONS,
   DEFAULT_LIMITS,
@@ -138,6 +139,26 @@ function positiveInteger(value) {
   return Number.isSafeInteger(value) && value > 0
 }
 
+/** Keep ordinary paths readable, but make escaped and shortened paths distinct. */
+function pathLabel(value) {
+  const raw = String(value)
+  let shown = ''
+  let consumed = 0
+  for (const character of raw) {
+    const code = character.codePointAt(0)
+    const piece = character === '\\' ? '\\\\'
+      : /[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}\p{Default_Ignorable_Code_Point}]/u.test(character)
+        ? code <= 0xffff ? `\\u${code.toString(16).padStart(4, '0')}` : `\\u{${code.toString(16)}}`
+        : character
+    if (shown.length + piece.length > 90) break
+    shown += piece
+    consumed += character.length
+  }
+  if (consumed === raw.length) return shown
+  const digest = createHash('sha256').update(raw, 'utf16le').digest('hex')
+  return `${shown}… [utf16len:${raw.length},sha256:${digest}]`
+}
+
 /**
  * The severity of one rule, read from the frozen catalog.
  *
@@ -158,7 +179,7 @@ function finding(ruleId, message, where, extra = {}) {
     ruleId,
     severity: severityOf(ruleId),
     message,
-    location: { file: sanitize(where.file, 200), pointer: where.pointer },
+    location: { file: pathLabel(where.file), pointer: where.pointer },
     line: where.line,
     ...extra,
   }
@@ -770,7 +791,7 @@ export function historyReport(ledgers, filters = {}, options = {}) {
     let taken = 0
     for (const entry of answer.result.entries) {
       if (entries.length >= limit) break
-      entries.push({ file: sanitize(answer.file, 200), ...entry })
+      entries.push({ file: pathLabel(answer.file), ...entry })
       taken += 1
     }
     if (cutAt === null && taken < answer.result.matched) cutAt = answer.file

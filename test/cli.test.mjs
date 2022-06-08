@@ -114,6 +114,33 @@ test('an invalid configuration leaves stdout empty; an unreadable input still re
   })
 })
 
+test('distinct unsafe and literal-escape ledger filenames have safe distinct locations', async () => {
+  await withDirectory(async (directory) => {
+    const clean = await cli(['verify', 'examples/ledger.jsonl', '--config', 'examples/ledger-policy.json', '--json'])
+    assert.equal(clean.code, 0)
+    const names = ['dirty\u0085.jsonl', 'dirty\\u0085.jsonl',
+      'a'.repeat(190) + 'A.jsonl', 'a'.repeat(190) + 'B.jsonl']
+    const labels = []
+    for (const name of names) {
+      await writeFile(join(directory, name), 'not-json\n', 'utf8')
+      const result = await cli(['verify', name, '--root', directory, '--json'], directory)
+      assert.equal(result.code, 2, name)
+      const report = JSON.parse(result.stdout)
+      assert.equal(report.status, 'incomplete')
+      assert.deepEqual(report.findings.map(f => f.ruleId), ['event-not-json', 'ledger-empty'])
+      assert.equal(report.findings.every(f => f.location.file === report.findings[0].location.file), true)
+      const label = report.findings[0].location.file
+      assert.ok(label.length <= 200)
+      assert.equal(label.includes('\u0085'), false)
+      labels.push(label)
+    }
+    assert.notEqual(labels[0], labels[1])
+    assert.notEqual(labels[2], labels[3])
+    assert.match(labels[2], /sha256:[0-9a-f]{64}/u)
+    assert.match(labels[3], /sha256:[0-9a-f]{64}/u)
+  })
+})
+
 test('a ledger outside the declared root is reported, not read', async () => {
   await withDirectory(async (directory) => {
     const root = join(directory, 'root')
