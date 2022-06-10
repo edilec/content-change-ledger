@@ -303,7 +303,7 @@ test('a matching long head id passes without a checkpoint finding', () => {
   assert.deepEqual(report.findings, [])
 })
 
-test('a checkpoint mismatch identifies a differing UTF-16 unit beyond the displayed id', () => {
+test('a hidden checkpoint id difference names source positions without revealing raw units', () => {
   const event = createEvent({ ...DRAFTS[0], id: `${'A'.repeat(65)}X` })
   const config = parseConfig({ schemaVersion: '1', head: { id: `${'A'.repeat(65)}Y`, hash: event.hash } })
   const report = run(textOf([event]), { config })
@@ -311,19 +311,22 @@ test('a checkpoint mismatch identifies a differing UTF-16 unit beyond the displa
   assert.equal(report.status, 'fail')
   const mismatch = report.findings.find((item) => item.ruleId === 'checkpoint-mismatch')
   assert.ok(mismatch)
-  assert.match(mismatch.evidence, /first differing UTF-16 unit at offset 65: U\+0058 vs U\+0059/)
+  assert.match(mismatch.evidence, /ledger \/events\/0.*configuration \/head/u)
+  assert.equal(mismatch.evidence.includes('U+0058'), false)
+  assert.equal(mismatch.evidence.includes('U+0059'), false)
   assert.equal(mismatch.evidence.includes(event.id), false)
   assert.equal(mismatch.evidence.includes(config.head.id), false)
 })
 
-test('a checkpoint mismatch identifies a hidden id extension without exposing it', () => {
+test('a hidden checkpoint id extension names source positions without revealing the suffix', () => {
   const event = createEvent({ ...DRAFTS[0], id: `${'A'.repeat(65)}X` })
   const config = parseConfig({ schemaVersion: '1', head: { id: `${event.id}Q`, hash: event.hash } })
   const report = run(textOf([event]), { config })
 
   assert.equal(report.status, 'fail')
   const mismatch = report.findings.find((item) => item.ruleId === 'checkpoint-mismatch')
-  assert.match(mismatch.evidence, /first differing UTF-16 unit at offset 66: end of id vs U\+0051/)
+  assert.match(mismatch.evidence, /ledger \/events\/0.*configuration \/head/u)
+  assert.equal(mismatch.evidence.includes('U+0051'), false)
   assert.equal(mismatch.evidence.includes(config.head.id), false)
 })
 

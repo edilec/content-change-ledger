@@ -189,16 +189,10 @@ function evidenceOf(text) {
   return sanitize(text, EVIDENCE_CODE_POINTS)
 }
 
-/** Disambiguate different ids only when their bounded, escaped excerpts collide. */
-function hiddenIdDifference(actual, expected) {
+/** Distinguish colliding excerpts by source position, never by hidden id content. */
+function hiddenIdDifference(actual, expected, tailIndex) {
   if (actual === expected || sanitize(actual, 60) !== sanitize(expected, 60)) return ''
-  let offset = 0
-  while (offset < actual.length && offset < expected.length
-    && actual.charCodeAt(offset) === expected.charCodeAt(offset)) offset += 1
-  const unit = (text) => offset === text.length
-    ? 'end of id'
-    : `U+${text.charCodeAt(offset).toString(16).toUpperCase().padStart(4, '0')}`
-  return `; ids first differing UTF-16 unit at offset ${offset}: ${unit(actual)} vs ${unit(expected)}`
+  return `; exact ids differ between ledger /events/${tailIndex} and configuration /head (values withheld)`
 }
 
 /**
@@ -579,7 +573,7 @@ export function verifyLedgers(ledgers, options = {}) {
           `The last event of this ledger is not the configured head checkpoint, so events were removed from or added after the checkpoint.`,
           { file: ledger.file, pointer: `/events/${records.length - 1}`, line: records.at(-1).line },
           {
-            evidence: `head ${sanitize(head.id, 60)} ${sanitize(head.hash, 80)}, expected ${sanitize(config.head.id, 60)} ${sanitize(config.head.hash, 80)}${hiddenIdDifference(head.id, config.head.id)}`,
+            evidence: `head ${sanitize(head.id, 60)} ${sanitize(head.hash, 80)}, expected ${sanitize(config.head.id, 60)} ${sanitize(config.head.hash, 80)}${hiddenIdDifference(head.id, config.head.id, records.length - 1)}`,
             suggestion: 'Update the checkpoint from a trusted copy, or investigate why the tail changed.',
           },
         ))
