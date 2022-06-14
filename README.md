@@ -173,7 +173,9 @@ one. A consumer that pipes stdout must handle both.
   leaves a perfectly consistent chain. Only a head checkpoint held somewhere the
   ledger's writer cannot reach (`head` in the configuration) detects it. Without
   one, every report carries the `tail-not-anchored` note rather than implying the
-  end of the file was checked.
+  end of the file was checked. A checkpoint mismatch reports the ledger event
+  position and which checkpoint field differs, but withholds both ID and hash
+  values from the finding.
 - **Anyone who can rewrite the whole file can forge a consistent one.** The chain
   detects an event altered or removed *without* recomputing everything after it.
   It proves nothing against a writer who rebuilds the ledger from the first line.

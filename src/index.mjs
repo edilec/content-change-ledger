@@ -189,12 +189,6 @@ function evidenceOf(text) {
   return sanitize(text, EVIDENCE_CODE_POINTS)
 }
 
-/** Distinguish colliding excerpts by source position, never by hidden id content. */
-function hiddenIdDifference(actual, expected, tailIndex) {
-  if (actual === expected || sanitize(actual, 60) !== sanitize(expected, 60)) return ''
-  return `; exact ids differ between ledger /events/${tailIndex} and configuration /head (values withheld)`
-}
-
 /**
  * Validate a configuration object. Anything unexpected is a usage error.
  *
@@ -568,12 +562,16 @@ export function verifyLedgers(ledgers, options = {}) {
     } else if (tailKnown) {
       const head = result.lastEvent
       if (head.id !== config.head.id || head.hash !== config.head.hash) {
+        const mismatchedFields = [
+          head.id !== config.head.id ? 'id' : null,
+          head.hash !== config.head.hash ? 'hash' : null,
+        ].filter(Boolean)
         state.findings.push(finding(
           'checkpoint-mismatch',
           `The last event of this ledger is not the configured head checkpoint, so events were removed from or added after the checkpoint.`,
           { file: ledger.file, pointer: `/events/${records.length - 1}`, line: records.at(-1).line },
           {
-            evidence: `head ${sanitize(head.id, 60)} ${sanitize(head.hash, 80)}, expected ${sanitize(config.head.id, 60)} ${sanitize(config.head.hash, 80)}${hiddenIdDifference(head.id, config.head.id, records.length - 1)}`,
+            evidence: `ledger /events/${records.length - 1} at line ${records.at(-1).line} vs configuration /head: ${mismatchedFields.join(' and ')} ${mismatchedFields.length === 1 ? 'differs' : 'differ'}; values withheld`,
             suggestion: 'Update the checkpoint from a trusted copy, or investigate why the tail changed.',
           },
         ))

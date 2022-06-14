@@ -284,7 +284,7 @@ test('the head checkpoint is what detects a truncated tail', () => {
   assert.deepEqual(ruleIds(truncated), ['checkpoint-mismatch@3'])
   assert.equal(truncated.status, 'fail')
   assert.equal(truncated.findings[0].evidence,
-    `head evt-0003 ${events[2].hash}, expected evt-0004 ${events[3].hash}`)
+    'ledger /events/2 at line 3 vs configuration /head: id and hash differ; values withheld')
 
   /* Without the checkpoint the same truncation is invisible, and the report
      says so rather than implying the tail was checked. */
@@ -328,6 +328,34 @@ test('a hidden checkpoint id extension names source positions without revealing 
   assert.match(mismatch.evidence, /ledger \/events\/0.*configuration \/head/u)
   assert.equal(mismatch.evidence.includes('U+0051'), false)
   assert.equal(mismatch.evidence.includes(config.head.id), false)
+})
+
+test('a short checkpoint id difference does not echo a synthetic secret-shaped id or event hash', () => {
+  const event = createEvent({ ...DRAFTS[0], id: 'token=SYNTHETIC_SECRET_CANARY' })
+  const matching = parseConfig({ schemaVersion: '1', head: { id: event.id, hash: event.hash } })
+  const different = parseConfig({ schemaVersion: '1', head: { id: 'other-id', hash: event.hash } })
+  assert.equal(run(textOf([event]), { config: matching }).status, 'pass')
+
+  const report = run(textOf([event]), { config: different })
+  assert.equal(report.status, 'fail')
+  const mismatch = report.findings.find((item) => item.ruleId === 'checkpoint-mismatch')
+  assert.ok(mismatch)
+  assert.match(mismatch.evidence, /ledger \/events\/0.*configuration \/head: id differs/u)
+  assert.equal(JSON.stringify(report).includes(event.id), false)
+  assert.equal(JSON.stringify(report).includes(event.hash), false)
+})
+
+test('a checkpoint hash difference names the field without echoing either hash', () => {
+  const event = createEvent(DRAFTS[0])
+  const otherHash = `sha256:${'0'.repeat(64)}`
+  const config = parseConfig({ schemaVersion: '1', head: { id: event.id, hash: otherHash } })
+  const report = run(textOf([event]), { config })
+  assert.equal(report.status, 'fail')
+  const mismatch = report.findings.find((item) => item.ruleId === 'checkpoint-mismatch')
+  assert.ok(mismatch)
+  assert.match(mismatch.evidence, /ledger \/events\/0.*configuration \/head: hash differs/u)
+  assert.equal(JSON.stringify(report).includes(event.hash), false)
+  assert.equal(JSON.stringify(report).includes(otherHash), false)
 })
 
 test('a checkpoint is not claimed when the tail was never read', () => {
