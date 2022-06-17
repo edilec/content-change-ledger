@@ -145,6 +145,8 @@ same label. A long file label carries a short prefix, its UTF-16 length, and a
 SHA-256 digest of its full UTF-16 path. A crafted id or file name cannot forge
 a line in the human report or reverse what it says.
 
+Duplicate-ID findings identify the two source lines without echoing the ID.
+
 A line or a configuration file that does not parse is reported by position,
 line and column -- never by quoting it back. `JSON.parse` embeds the input in
 one of its two error messages, so a file short enough to be only a credential

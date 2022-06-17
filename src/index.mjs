@@ -335,7 +335,7 @@ function verifyRecords(ledger, records, config, state) {
     if (ids.has(event.id)) {
       findings.push(finding(
         'event-id-duplicate',
-        `Event id "${sanitize(event.id, 80)}" was already recorded on line ${ids.get(event.id)}; an event id identifies one event forever.`,
+        `Event on line ${record.line} reuses an id first recorded on line ${ids.get(event.id)}; an event id identifies one event forever.`,
         where,
         { suggestion: 'Give the new event its own id. A change of mind is a correction event, not a reused id.' },
       ))

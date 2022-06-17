@@ -81,8 +81,24 @@ test('a duplicate event id is an error naming the line that already used it', ()
   const duplicate = report.findings.find((item) => item.ruleId === 'event-id-duplicate')
   assert.equal(duplicate.line, 5)
   assert.equal(duplicate.severity, 'error')
-  assert.match(duplicate.message, /already recorded on line 2/)
+  assert.match(duplicate.message, /line 5.*first recorded on line 2/u)
   assert.equal(report.status, 'fail')
+})
+
+test('a duplicate event id reports both line positions without echoing an accepted secret-shaped id', () => {
+  const id = 'token=SYNTHETIC_SECRET_CANARY'
+  const first = createEvent({ ...DRAFTS[0], id })
+  const distinct = createEvent({ ...DRAFTS[2], id: 'other-id' }, first.hash)
+  assert.equal(run(textOf([first, distinct])).status, 'pass')
+
+  const duplicate = createEvent({ ...DRAFTS[2], id }, first.hash)
+  const report = run(textOf([first, duplicate]))
+  assert.equal(report.status, 'fail')
+  const finding = report.findings.find((item) => item.ruleId === 'event-id-duplicate')
+  assert.ok(finding)
+  assert.equal(finding.line, 2)
+  assert.match(finding.message, /line 1/u)
+  assert.equal(JSON.stringify(report).includes(id), false)
 })
 
 test('an event lifted out of the middle breaks the chain at the line after it', () => {

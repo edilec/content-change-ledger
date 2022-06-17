@@ -120,10 +120,9 @@ test('a field refuses every control character, and keeps the bidi marks real tex
   assert.equal(serializeEvent(createEvent(draft({ reason: arabicish }))).includes(RIGHT_TO_LEFT_MARK), false)
 })
 
-test('an identifier carrying an override cannot reverse the report line that quotes it', () => {
-  /* The character arrives through an id -- an identifier, not an excerpt -- and
-     the id is quoted back in the message of the finding it caused. An override
-     is valid inside a field, so this is the path no field check can close. */
+test('a bidi-marked duplicate identifier is located without being quoted', () => {
+  /* An override is valid inside an event id, so a duplicate finding must name
+     source lines without copying that identity into the report. */
   const id = `evt-0001${RIGHT_TO_LEFT_OVERRIDE}${FIRST_STRONG_ISOLATE}error   nothing is wrong here`
   const first = createEvent(draft({ id }))
   const second = createEvent(draft({ id, subject: 'install.md', afterHash: H2 }), first.hash)
@@ -135,7 +134,8 @@ test('an identifier carrying an override cannot reverse the report line that quo
   for (const [name, character] of UNSAFE) {
     assert.equal(duplicate.message.includes(character), false, `${name} reached the message raw`)
   }
-  assert.match(duplicate.message, /evt-0001\\u202e\\u2068error/)
+  assert.match(duplicate.message, /line 2.*line 1/u)
+  assert.equal(duplicate.message.includes('evt-0001'), false)
   assert.equal(JSON.stringify(report).includes(RIGHT_TO_LEFT_OVERRIDE), false)
 })
 
