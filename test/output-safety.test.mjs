@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url'
 
 import {
   createEvent,
+  formatHistory,
   historyReport,
   isControlFree,
   sanitize,
@@ -57,6 +58,55 @@ const UNSAFE = Object.freeze([
 
 const H1 = `sha256:${'1'.repeat(64)}`
 const H2 = `sha256:${'2'.repeat(64)}`
+
+test('history v2 locates an accepted secret-shaped id without outputting the id or chain hash', () => {
+  const id = 'token=SYNTHETIC_SECRET_CANARY'
+  const event = createEvent(draft({ id }))
+  const report = historyReport([{ file: 'ledger.jsonl', text: `${serializeEvent(event)}${NEWLINE}` }])
+  assert.equal(report.status, 'pass')
+  assert.equal(report.schemaVersion, '2')
+  assert.equal(report.entries[0].pointer, '/events/0')
+  assert.equal(report.entries[0].line, 1)
+  assert.equal(Object.hasOwn(report.entries[0], 'id'), false)
+  assert.equal(Object.hasOwn(report.entries[0], 'hash'), false)
+  assert.equal(Object.hasOwn(report.entries[0], 'previousHash'), false)
+  assert.equal(JSON.stringify(report).includes(id), false)
+  assert.equal(JSON.stringify(report).includes(event.hash), false)
+  assert.match(formatHistory(report), /ledger\.jsonl:1/u)
+  assert.equal(formatHistory(report).includes(id), false)
+})
+
+test('history v2 keeps duplicate-id correction relationships as source candidates', () => {
+  const first = createEvent(draft({ id: 'SHARED', subject: 'a.md' }))
+  const second = createEvent(draft({ id: 'SHARED', subject: 'b.md', afterHash: H2,
+    recordedAt: '2026-09-02T09:00:00.000Z' }), first.hash)
+  const correction = createEvent(draft({ id: 'FIX', subject: 'a.md', action: 'correct',
+    beforeHash: H1, afterHash: H1, corrects: 'SHARED', recordedAt: '2026-09-03T09:00:00.000Z' }), second.hash)
+  const distinct = createEvent(draft({ id: 'DISTINCT', subject: 'b.md', afterHash: H2,
+    recordedAt: '2026-09-02T09:00:00.000Z' }), first.hash)
+  const uniqueCorrection = createEvent(draft({ id: 'FIX', subject: 'a.md', action: 'correct',
+    beforeHash: H1, afterHash: H1, corrects: 'SHARED', recordedAt: '2026-09-03T09:00:00.000Z' }), distinct.hash)
+  const uniqueText = [first, distinct, uniqueCorrection].map(serializeEvent).join(NEWLINE) + NEWLINE
+  const unique = historyReport([{ file: 'ledger.jsonl', text: uniqueText }], { subject: 'a.md' })
+  assert.equal(unique.status, 'pass')
+  assert.deepEqual(unique.entries[1].correctionTargetCandidates, ['/events/0'])
+  assert.deepEqual(unique.entries[0].supersededByCandidates, ['/events/2'])
+  const text = [first, second, correction].map(serializeEvent).join(NEWLINE) + NEWLINE
+  const report = historyReport([{ file: 'ledger.jsonl', text }], { subject: 'a.md' })
+  assert.equal(report.status, 'incomplete')
+  assert.deepEqual(report.findings.map((item) => item.ruleId), ['history-identity-ambiguous'])
+  assert.deepEqual(report.entries.map((entry) => entry.pointer), ['/events/0', '/events/2'])
+  assert.deepEqual(report.entries[0].supersededByCandidates, ['/events/2'])
+  assert.deepEqual(report.entries[1].correctionTargetCandidates, ['/events/0', '/events/1'])
+})
+
+test('history v2 renders accepted bidi-marked descriptive fields safely in JSON', () => {
+  const event = createEvent(draft({ reason: `review${RIGHT_TO_LEFT_OVERRIDE}note` }))
+  const report = historyReport([{ file: 'ledger.jsonl', text: `${serializeEvent(event)}${NEWLINE}` }])
+  assert.equal(report.status, 'pass')
+  assert.equal(JSON.stringify(report).includes(RIGHT_TO_LEFT_OVERRIDE), false)
+  assert.match(report.entries[0].reason, /review\\u202enote/u)
+})
 
 function draft(overrides = {}) {
   return {

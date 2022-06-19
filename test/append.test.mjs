@@ -116,11 +116,13 @@ test('a correction appends an event; the event it corrects keeps its bytes', asy
     const { ledgers } = await readLedgers(['ledger.jsonl'], options)
     assert.equal(verifyLedgers(ledgers).status, 'pass')
     const report = historyReport(ledgers, { subject: 'pricing.md' })
-    assert.deepEqual(report.entries.map((entry) => `${entry.id}:${entry.supersededBy.join(',')}`), [
-      'evt-0001:',
-      'evt-0002:evt-0004',
-      'evt-0004:',
+    assert.equal(report.schemaVersion, '2')
+    assert.deepEqual(report.entries.map((entry) => `${entry.pointer}:${entry.supersededByCandidates.join(',')}`), [
+      '/events/0:',
+      '/events/1:/events/3',
+      '/events/3:',
     ])
+    assert.deepEqual(report.entries[2].correctionTargetCandidates, ['/events/1'])
     /* The annotation is for the reader only; it is never written to the file. */
     assert.equal(after.includes('supersededBy'), false)
   })
@@ -242,16 +244,16 @@ test('a query filters by subject, owner, release, action and time', async () => 
   await withDirectory(async (directory) => {
     const { options } = await seed(directory)
     const { ledgers } = await readLedgers(['ledger.jsonl'], options)
-    const ids = (filters) => historyReport(ledgers, filters).entries.map((entry) => entry.id)
+    const pointers = (filters) => historyReport(ledgers, filters).entries.map((entry) => entry.pointer)
 
-    assert.deepEqual(ids({}), ['evt-0001', 'evt-0002', 'evt-0003'])
-    assert.deepEqual(ids({ subject: 'install.md' }), ['evt-0003'])
-    assert.deepEqual(ids({ owner: 'content-team' }), ['evt-0001', 'evt-0002'])
-    assert.deepEqual(ids({ releaseId: '2026.09.1' }), ['evt-0002', 'evt-0003'])
-    assert.deepEqual(ids({ action: 'update' }), ['evt-0002'])
-    assert.deepEqual(ids({ since: '2026-09-02T00:00:00.000Z' }), ['evt-0002', 'evt-0003'])
-    assert.deepEqual(ids({ until: '2026-09-02T00:00:00.000Z' }), ['evt-0001'])
-    assert.deepEqual(ids({ subject: 'install.md', owner: 'content-team' }), [])
+    assert.deepEqual(pointers({}), ['/events/0', '/events/1', '/events/2'])
+    assert.deepEqual(pointers({ subject: 'install.md' }), ['/events/2'])
+    assert.deepEqual(pointers({ owner: 'content-team' }), ['/events/0', '/events/1'])
+    assert.deepEqual(pointers({ releaseId: '2026.09.1' }), ['/events/1', '/events/2'])
+    assert.deepEqual(pointers({ action: 'update' }), ['/events/1'])
+    assert.deepEqual(pointers({ since: '2026-09-02T00:00:00.000Z' }), ['/events/1', '/events/2'])
+    assert.deepEqual(pointers({ until: '2026-09-02T00:00:00.000Z' }), ['/events/0'])
+    assert.deepEqual(pointers({ subject: 'install.md', owner: 'content-team' }), [])
     assert.equal(historyReport(ledgers, { subject: 'install.md' }).status, 'pass')
   })
 })
@@ -306,7 +308,7 @@ test('a malformed time window is refused, never answered with an authoritative n
 
     /* The one spelling the ledger itself uses is still accepted, and still filters. */
     const window = historyReport(ledgers, { since: '2026-09-02T00:00:00.000Z', until: '2026-09-02T23:59:59.999Z' })
-    assert.deepEqual(window.entries.map((entry) => entry.id), ['evt-0002'])
+    assert.deepEqual(window.entries.map((entry) => entry.pointer), ['/events/1'])
     assert.equal(window.status, 'pass')
   })
 })
@@ -324,8 +326,8 @@ test('the limit bounds the answer, not each ledger separately', async () => {
     assert.equal(cut.entries.length, 4)
     assert.equal(cut.summary.matched, 4)
     assert.equal(cut.status, 'incomplete')
-    assert.deepEqual(cut.entries.map((entry) => `${entry.file}:${entry.id}`), [
-      'a.jsonl:evt-0001', 'a.jsonl:evt-0002', 'a.jsonl:evt-0003', 'b.jsonl:evt-0001',
+    assert.deepEqual(cut.entries.map((entry) => `${entry.file}:${entry.pointer}`), [
+      'a.jsonl:/events/0', 'a.jsonl:/events/1', 'a.jsonl:/events/2', 'b.jsonl:/events/0',
     ])
     const truncation = cut.findings.filter((item) => item.ruleId === 'history-truncated')
     assert.equal(truncation.length, 1)
@@ -361,13 +363,13 @@ test('a history that could not read an input, or stopped at a bound, says so in 
     assert.match(unreadable.message, /This input was not read: this ledger could not be read/)
     assert.equal(unread.summary.files, 2)
     assert.equal(unread.summary.filesRead, 1)
-    assert.deepEqual(unread.entries.map((entry) => entry.id), ['evt-0001', 'evt-0002', 'evt-0003'])
+    assert.deepEqual(unread.entries.map((entry) => entry.pointer), ['/events/0', '/events/1', '/events/2'])
 
     /* And a ledger the event bound cut short: the entries it did read are
        returned, and the report is incomplete rather than a short pass. */
     const stopped = historyReport(ledgers, {}, { limits: { ...DEFAULT_LIMITS, maxEvents: 2 } })
     assert.equal(stopped.status, 'incomplete')
-    assert.deepEqual(stopped.entries.map((entry) => entry.id), ['evt-0001', 'evt-0002'])
+    assert.deepEqual(stopped.entries.map((entry) => entry.pointer), ['/events/0', '/events/1'])
     const limit = stopped.findings.find((item) => item.ruleId === 'limit-exceeded')
     assert.match(limit.message, /The maxEvents limit of 2 was exceeded \(observed 3\); this history stops early/)
     assert.equal(limit.location.file, 'ledger.jsonl')
@@ -384,7 +386,7 @@ test('a query over a ledger it could not read in full says so', async () => {
     const { ledgers } = await readLedgers(['ledger.jsonl'], options)
     const report = historyReport(ledgers, { subject: 'pricing.md' })
     assert.equal(report.status, 'incomplete')
-    assert.deepEqual(report.entries.map((entry) => entry.id), ['evt-0001'])
+    assert.deepEqual(report.entries.map((entry) => entry.pointer), ['/events/0'])
     assert.deepEqual(report.findings.map((item) => item.ruleId), ['event-not-json'])
 
     const empty = historyReport([{ file: 'ledger.jsonl', text: '' }], {})

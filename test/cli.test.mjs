@@ -212,7 +212,9 @@ test('a correction is appended through the CLI, and the corrected line is untouc
     const history = await cli(['history', 'ledger.jsonl', '--root', directory, '--json'], directory)
     assert.equal(history.code, 0)
     const report = JSON.parse(history.stdout)
-    assert.deepEqual(report.entries.map((entry) => entry.supersededBy), [['evt-0002'], []])
+    assert.equal(report.schemaVersion, '2')
+    assert.deepEqual(report.entries.map((entry) => entry.supersededByCandidates), [['/events/1'], []])
+    assert.deepEqual(report.entries[1].correctionTargetCandidates, ['/events/0'])
   })
 })
 
@@ -227,11 +229,30 @@ test('a history the limit cut short exits 2 and says which limit cut it', async 
   const whole = await cli(['history', 'examples/ledger.jsonl', '--subject', 'content/pricing.md'])
   assert.equal(whole.code, 0)
   assert.match(whole.stdout, /3 matching event\(s\) of 4 read, status pass/)
-  assert.match(whole.stdout, /corrected-by=evt-0004/)
+  assert.match(whole.stdout, /superseded-by-candidates=\/events\/3/u)
 
   const bad = await cli(['history', 'examples/ledger.jsonl', '--limit', 'many'])
   assert.equal(bad.code, 2)
   assert.equal(bad.stdout, '')
+})
+
+test('history CLI version 2 withholds an accepted secret-shaped event id in both output modes', async () => {
+  await withDirectory(async (directory) => {
+    const id = 'token=SYNTHETIC_SECRET_CANARY'
+    const appended = await cli([...APPEND, '--id', id, '--root', directory], directory)
+    assert.equal(appended.code, 0)
+    const json = await cli(['history', 'ledger.jsonl', '--root', directory, '--json'], directory)
+    const human = await cli(['history', 'ledger.jsonl', '--root', directory], directory)
+    assert.equal(json.code, 0)
+    assert.equal(human.code, 0)
+    const report = JSON.parse(json.stdout)
+    assert.equal(report.schemaVersion, '2')
+    assert.equal(report.entries[0].pointer, '/events/0')
+    assert.equal(report.entries[0].line, 1)
+    assert.equal(json.stdout.includes(id), false)
+    assert.equal(human.stdout.includes(id), false)
+    assert.match(human.stdout, /ledger\.jsonl:1/u)
+  })
 })
 
 test('a malformed --since or --until leaves stdout empty and exits 2', async () => {

@@ -221,6 +221,15 @@ const FIXTURES = [
     exit: 2, status: 'incomplete', counts: [0, 1, 0], findings: ['history-truncated@1'],
   },
   {
+    ruleId: 'history-identity-ambiguous',
+    text: () => textOf(chain([
+      draft(),
+      draft({ subject: 'install.md', afterHash: H2, recordedAt: '2026-09-02T09:00:00.000Z' }),
+    ])),
+    verb: 'history',
+    exit: 2, status: 'incomplete', counts: [0, 1, 0], findings: ['history-identity-ambiguous@2'],
+  },
+  {
     ruleId: 'event-recorded-at-out-of-order',
     text: () => textOf(chain([
       draft({ recordedAt: '2026-09-02T09:00:00.000Z' }),

@@ -107,6 +107,7 @@ export const RULES = Object.freeze({
   'checkpoint-mismatch': 'error',
   'event-recorded-at-out-of-order': 'warning',
   'history-truncated': 'warning',
+  'history-identity-ambiguous': 'warning',
   'tail-not-anchored': 'info',
 })
 
@@ -124,6 +125,7 @@ export const INCOMPLETE_RULES = Object.freeze([
   'event-field-invalid',
   'event-field-unknown',
   'history-truncated',
+  'history-identity-ambiguous',
 ])
 
 const CONFIG_KEYS = Object.freeze(['schemaVersion', 'limits', 'head', 'owners', 'releaseIdPattern'])
@@ -671,7 +673,7 @@ function resolveQuery(filters, limits) {
  * the ids of later correction events that name it -- computed for the reader,
  * never stored, because annotating a stored event would be rewriting it.
  */
-export function queryHistory(events, filters = {}, limits = DEFAULT_LIMITS) {
+function queryHistoryIndexed(events, filters = {}, limits = DEFAULT_LIMITS) {
   const limit = resolveQuery(filters, limits)
 
   const corrections = new Map()
@@ -682,7 +684,7 @@ export function queryHistory(events, filters = {}, limits = DEFAULT_LIMITS) {
     corrections.set(event.corrects, list)
   }
 
-  const matched = events.filter((event) => {
+  const matched = events.map((event, index) => ({ event, index })).filter(({ event }) => {
     if (filters.subject !== undefined && event.subject !== filters.subject) return false
     if (filters.owner !== undefined && event.owner !== filters.owner) return false
     if (filters.releaseId !== undefined && event.releaseId !== filters.releaseId) return false
@@ -692,14 +694,24 @@ export function queryHistory(events, filters = {}, limits = DEFAULT_LIMITS) {
     return true
   })
 
-  const entries = matched.slice(0, limit).map((event) => {
+  const selected = matched.slice(0, limit)
+  const entries = selected.map(({ event }) => {
     const copy = {}
     for (const key of EVENT_KEYS) copy[key] = event[key]
     copy.supersededBy = [...(corrections.get(event.id) ?? [])]
     return copy
   })
 
-  return { entries, matched: matched.length, truncated: matched.length > entries.length, limit }
+  return {
+    entries, sourceIndices: selected.map(({ index }) => index),
+    matched: matched.length, truncated: matched.length > entries.length, limit,
+  }
+}
+
+export function queryHistory(events, filters = {}, limits = DEFAULT_LIMITS) {
+  const { sourceIndices, ...result } = queryHistoryIndexed(events, filters, limits)
+  void sourceIndices
+  return result
 }
 
 /**
@@ -743,6 +755,7 @@ export function historyReport(ledgers, filters = {}, options = {}) {
     }
 
     const events = []
+    const positions = []
     for (const record of records) {
       if (record.event === null) {
         state.incomplete = true
@@ -756,6 +769,7 @@ export function historyReport(ledgers, filters = {}, options = {}) {
         continue
       }
       events.push(record.event)
+      positions.push({ index: record.index, line: record.line })
       state.checked += 1
       if (record.event.action === 'correct') state.corrections += 1
     }
@@ -770,7 +784,7 @@ export function historyReport(ledgers, filters = {}, options = {}) {
       ))
     }
 
-    answers.push({ file: ledger.file, result: queryHistory(events, filters, limits) })
+    answers.push({ file: ledger.file, events, positions, result: queryHistoryIndexed(events, filters, limits) })
   }
 
   /* The limit is spent across the whole answer, in the order the ledgers were
@@ -781,9 +795,43 @@ export function historyReport(ledgers, filters = {}, options = {}) {
   for (const answer of answers) {
     matched += answer.result.matched
     let taken = 0
-    for (const entry of answer.result.entries) {
+    const pointerFor = (position) => `/events/${answer.positions[position].index}`
+    const idPositions = new Map()
+    const correctingPositions = new Map()
+    const firstIdPosition = new Map()
+    for (const [position, event] of answer.events.entries()) {
+      if (firstIdPosition.has(event.id)) {
+        const first = firstIdPosition.get(event.id)
+        state.incomplete = true
+        state.findings.push(finding(
+          'history-identity-ambiguous',
+          `Events on lines ${answer.positions[first].line} and ${answer.positions[position].line} share an id; correction relationships cannot be unique.`,
+          { file: answer.file, pointer: pointerFor(position), line: answer.positions[position].line },
+        ))
+      } else {
+        firstIdPosition.set(event.id, position)
+      }
+      const owners = idPositions.get(event.id) ?? []
+      owners.push(pointerFor(position))
+      idPositions.set(event.id, owners)
+      if (event.corrects !== null) {
+        const correcting = correctingPositions.get(event.corrects) ?? []
+        correcting.push(pointerFor(position))
+        correctingPositions.set(event.corrects, correcting)
+      }
+    }
+    for (const position of answer.result.sourceIndices) {
       if (entries.length >= limit) break
-      entries.push({ file: pathLabel(answer.file), ...entry })
+      const event = answer.events[position]
+      entries.push({
+        file: pathLabel(answer.file), pointer: pointerFor(position), line: answer.positions[position].line,
+        subject: sanitize(event.subject, 80), action: sanitize(event.action, 10),
+        beforeHash: event.beforeHash, afterHash: event.afterHash,
+        reason: sanitize(event.reason, 120), owner: sanitize(event.owner, 40),
+        releaseId: sanitize(event.releaseId, 40), recordedAt: sanitize(event.recordedAt, 40),
+        correctionTargetCandidates: event.corrects === null ? null : [...(idPositions.get(event.corrects) ?? [])],
+        supersededByCandidates: [...(correctingPositions.get(event.id) ?? [])],
+      })
       taken += 1
     }
     if (cutAt === null && taken < answer.result.matched) cutAt = answer.file
@@ -803,7 +851,7 @@ export function historyReport(ledgers, filters = {}, options = {}) {
     filesRead: ledgers.length,
     subjects: new Set(entries.map((entry) => entry.subject)).size,
     matched: entries.length,
-  }, { entries })
+  }, { schemaVersion: '2', entries })
   return report
 }
 
@@ -890,12 +938,15 @@ export function formatReport(report) {
 export function formatHistory(report) {
   const lines = report.entries.map((entry) => [
     sanitize(entry.recordedAt, 40),
-    sanitize(entry.id, 40),
+    `${entry.file}:${entry.line}`,
     sanitize(entry.action, 10).padEnd(6),
     sanitize(entry.subject, 80),
     `owner=${sanitize(entry.owner, 40)}`,
     `release=${sanitize(entry.releaseId, 40)}`,
-    entry.supersededBy.length > 0 ? `corrected-by=${entry.supersededBy.map((id) => sanitize(id, 40)).join(',')}` : '',
+    entry.correctionTargetCandidates !== null
+      ? `correction-target-candidates=${entry.correctionTargetCandidates.join(',') || 'none'}` : '',
+    entry.supersededByCandidates.length > 0
+      ? `superseded-by-candidates=${entry.supersededByCandidates.join(',')}` : '',
     `reason=${sanitize(entry.reason, 120)}`,
   ].filter((part) => part !== '').join(' '))
   lines.push(...report.findings.map((item) =>

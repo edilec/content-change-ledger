@@ -107,6 +107,7 @@ cannot turn an unread input green.
 | `ledger-empty` | warning | yes | A ledger holds no verifiable event, so nothing was verified |
 | `event-recorded-at-out-of-order` | warning | no | An event is recorded earlier than the line above it |
 | `history-truncated` | warning | yes | A query matched more events than its limit returned |
+| `history-identity-ambiguous` | warning | yes | Duplicate event IDs make history correction relationships non-unique |
 | `tail-not-anchored` | info | no | No head checkpoint is configured, so tail truncation is undetectable |
 
 ## What "unknown" means here

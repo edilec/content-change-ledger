@@ -131,12 +131,25 @@ straight into a parser. Diagnostics always go to stderr.
 }
 ```
 
-`history --json` returns the same envelope with an `entries` array. Each entry
-is a copy of the stored event plus `supersededBy`, the ids of later corrections
-that name it, and the ledger `file` it came from. That annotation is computed
-for the reader and is never written into the file.
+`history --json` returns a version **2** report envelope with an `entries`
+array. Verify reports remain version **1**. Version 2 history entries identify
+the source `file`, `/events/N` `pointer`, and `line`; they retain descriptive
+fields such as subject, action, reason, owner, release and recorded time. They
+do not echo event IDs, event-chain hashes or correction IDs. Instead,
+`correctionTargetCandidates` and `supersededByCandidates` contain source
+pointers within the same ledger. The word “candidates” matters: duplicate IDs
+can make a relationship ambiguous; history then reports incomplete with
+`history-identity-ambiguous`, and `verify` remains the integrity check.
+These annotations are computed for the reader and never written into the file.
 
-Every untrusted string in either output -- an id, a path, a message, an excerpt
+Migration from history version 1: replace `entries[].id` with the pair
+`entries[].file` and `entries[].pointer`; replace raw `corrects` and
+`supersededBy` IDs with the position-candidate arrays. Code that needs the
+original event fields must read the authorized ledger itself. The low-level
+`queryHistory(events)` library helper still returns copies of the caller's
+in-memory event objects and is not a redacted report boundary.
+
+Every untrusted string in either output -- a path, a message, an excerpt
 -- is bounded and escaped. Control characters (C0, DEL and C1, which is where
 U+0085 hides), line separators, and bidirectional overrides become visible
 escape text. File labels additionally double literal backslashes, so an actual
