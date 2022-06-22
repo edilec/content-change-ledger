@@ -744,6 +744,7 @@ export function historyReport(ledgers, filters = {}, options = {}) {
 
   for (const ledger of ledgers) {
     const { records, limitProblem } = parseLedger(ledger.text, { limits, clock: options.clock })
+    let relationshipIndexComplete = limitProblem === null
     if (limitProblem !== null) {
       state.incomplete = true
       state.findings.push(finding(
@@ -759,6 +760,7 @@ export function historyReport(ledgers, filters = {}, options = {}) {
     for (const record of records) {
       if (record.event === null) {
         state.incomplete = true
+        relationshipIndexComplete = false
         const problem = record.problems[0]
         state.findings.push(finding(
           PROBLEM_RULES[problem.kind],
@@ -784,7 +786,8 @@ export function historyReport(ledgers, filters = {}, options = {}) {
       ))
     }
 
-    answers.push({ file: ledger.file, events, positions, result: queryHistoryIndexed(events, filters, limits) })
+    answers.push({ file: ledger.file, events, positions, relationshipIndexComplete,
+      result: queryHistoryIndexed(events, filters, limits) })
   }
 
   /* The limit is spent across the whole answer, in the order the ledgers were
@@ -831,8 +834,10 @@ export function historyReport(ledgers, filters = {}, options = {}) {
         beforeHash: event.beforeHash, afterHash: event.afterHash,
         reason: sanitize(event.reason, 120), owner: sanitize(event.owner, 40),
         releaseId: sanitize(event.releaseId, 40), recordedAt: sanitize(event.recordedAt, 40),
-        correctionTargetCandidates: event.corrects === null ? null : [...(idPositions.get(event.corrects) ?? [])],
-        supersededByCandidates: [...(correctingPositions.get(event.id) ?? [])],
+        correctionTargetCandidates: event.corrects === null || !answer.relationshipIndexComplete
+          ? null : [...(idPositions.get(event.corrects) ?? [])],
+        supersededByCandidates: answer.relationshipIndexComplete
+          ? [...(correctingPositions.get(event.id) ?? [])] : null,
       })
       taken += 1
     }
@@ -947,8 +952,10 @@ export function formatHistory(report) {
     `release=${sanitize(entry.releaseId, 40)}`,
     entry.correctionTargetCandidates !== null
       ? `correction-target-candidates=${entry.correctionTargetCandidates.join(',') || 'none'}` : '',
-    entry.supersededByCandidates.length > 0
-      ? `superseded-by-candidates=${entry.supersededByCandidates.join(',')}` : '',
+    entry.supersededByCandidates === null
+      ? 'relationship-candidates=unknown'
+      : entry.supersededByCandidates.length > 0
+        ? `superseded-by-candidates=${entry.supersededByCandidates.join(',')}` : '',
     `reason=${sanitize(entry.reason, 120)}`,
   ].filter((part) => part !== '').join(' '))
   lines.push(...report.findings.map((item) =>

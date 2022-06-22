@@ -141,6 +141,12 @@ pointers within the same ledger. The word “candidates” matters: duplicate ID
 can make a relationship ambiguous; history then reports incomplete with
 `history-identity-ambiguous`, and `verify` remains the integrity check.
 These annotations are computed for the reader and never written into the file.
+When any line in a ledger cannot be interpreted, that ledger's relationship
+index is incomplete: candidate arrays are `null` (unknown), not empty arrays
+claiming no match. The human report says `relationship-candidates=unknown` for
+those entries. On a complete ledger, an empty candidate array really means no
+candidate; `correctionTargetCandidates` is also `null` when the event does not
+declare a correction target.
 
 Migration from history version 1: replace `entries[].id` with the pair
 `entries[].file` and `entries[].pointer`; replace raw `corrects` and

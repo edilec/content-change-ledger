@@ -122,6 +122,58 @@ test('history v2 keeps duplicate-id correction relationships as source candidate
   assert.deepEqual(report.entries[1].correctionTargetCandidates, ['/events/0', '/events/1'])
 })
 
+test('history with an unreadable target or correction withholds partial relationship indexes', async () => {
+  const target = createEvent(draft({ id: 'target' }))
+  const correction = createEvent(draft({ id: 'correction', action: 'correct',
+    beforeHash: H1, afterHash: H1, corrects: 'target',
+    recordedAt: '2026-09-02T09:00:00.000Z' }), target.hash)
+  const reportFor = (lines, options = {}) => historyReport(
+    [{ file: 'ledger.jsonl', text: lines.map((line) => JSON.stringify(line)).join(NEWLINE) + NEWLINE }],
+    {}, options,
+  )
+
+  const whole = reportFor([target, correction])
+  assert.equal(whole.status, 'pass')
+  assert.deepEqual(whole.entries[0].supersededByCandidates, ['/events/1'])
+  assert.deepEqual(whole.entries[1].correctionTargetCandidates, ['/events/0'])
+  const exactlyAtBound = reportFor([target, correction], { limits: { maxEvents: 2 } })
+  assert.equal(exactlyAtBound.status, 'pass')
+  assert.deepEqual(exactlyAtBound.entries[0].supersededByCandidates, ['/events/1'])
+  const oneBeyondBound = reportFor([target, correction], { limits: { maxEvents: 1 } })
+  assert.equal(oneBeyondBound.status, 'incomplete')
+  assert.equal(oneBeyondBound.findings.some((item) => item.ruleId === 'limit-exceeded'), true)
+  assert.equal(oneBeyondBound.entries[0].supersededByCandidates, null)
+
+  await withDirectory(async (directory) => {
+    for (const [invalidPosition, presentPointer, candidateKey] of [
+      [0, '/events/1', 'correctionTargetCandidates'],
+      [1, '/events/0', 'supersededByCandidates'],
+    ]) {
+      const lines = [target, correction].map((event) => ({ ...event }))
+      delete lines[invalidPosition].owner
+      const report = reportFor(lines)
+      assert.equal(report.status, 'incomplete')
+      assert.deepEqual(report.findings.map((item) => item.ruleId), ['event-field-missing'])
+      assert.equal(report.entries.length, 1)
+      assert.equal(report.entries[0].pointer, presentPointer)
+      assert.equal(report.entries[0][candidateKey], null,
+        'a partial index cannot claim that an unseen relationship has no candidate')
+
+      await writeFile(join(directory, 'ledger.jsonl'), lines.map((line) => JSON.stringify(line)).join(NEWLINE) + NEWLINE)
+      const invoked = await cli(['history', 'ledger.jsonl', '--root', directory, '--json'], directory)
+      assert.equal(invoked.code, 2)
+      const emitted = JSON.parse(invoked.stdout)
+      assert.equal(emitted.status, 'incomplete')
+      assert.equal(emitted.entries[0][candidateKey], null)
+
+      const human = await cli(['history', 'ledger.jsonl', '--root', directory], directory)
+      assert.equal(human.code, 2)
+      assert.match(human.stdout, /relationship-candidates=unknown/u)
+      assert.equal(human.stdout.includes('correction-target-candidates=none'), false)
+    }
+  })
+})
+
 test('history v2 renders accepted bidi-marked descriptive fields safely in JSON', () => {
   const event = createEvent(draft({ reason: `review${RIGHT_TO_LEFT_OVERRIDE}note` }))
   const report = historyReport([{ file: 'ledger.jsonl', text: `${serializeEvent(event)}${NEWLINE}` }])
