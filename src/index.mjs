@@ -792,6 +792,7 @@ export function historyReport(ledgers, filters = {}, options = {}) {
      return N times the bound and call the result complete. */
   let matched = 0
   let cutAt = null
+  const representedSubjects = new Set()
   for (const answer of answers) {
     matched += answer.result.matched
     let taken = 0
@@ -823,6 +824,7 @@ export function historyReport(ledgers, filters = {}, options = {}) {
     for (const position of answer.result.sourceIndices) {
       if (entries.length >= limit) break
       const event = answer.events[position]
+      representedSubjects.add(event.subject)
       entries.push({
         file: pathLabel(answer.file), pointer: pointerFor(position), line: answer.positions[position].line,
         subject: sanitize(event.subject, 80), action: sanitize(event.action, 10),
@@ -849,7 +851,7 @@ export function historyReport(ledgers, filters = {}, options = {}) {
   const report = buildReport(state, {
     files: ledgers.length + failures.length,
     filesRead: ledgers.length,
-    subjects: new Set(entries.map((entry) => entry.subject)).size,
+    subjects: representedSubjects.size,
     matched: entries.length,
   }, { schemaVersion: '2', entries })
   return report

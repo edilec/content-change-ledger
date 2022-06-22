@@ -76,6 +76,28 @@ test('history v2 locates an accepted secret-shaped id without outputting the id 
   assert.equal(formatHistory(report).includes(id), false)
 })
 
+test('history counts distinct raw subjects even when bounded display labels collide', () => {
+  const reportFor = (firstSubject, secondSubject) => {
+    const first = createEvent(draft({ id: 'evt-a', subject: firstSubject }))
+    const second = createEvent(draft({ id: 'evt-b', subject: secondSubject,
+      afterHash: H2, recordedAt: '2026-09-02T09:00:00.000Z' }), first.hash)
+    return historyReport([{ file: 'ledger.jsonl', text: [first, second].map(serializeEvent).join(NEWLINE) + NEWLINE }])
+  }
+
+  const atBound = reportFor(`${'x'.repeat(79)}A`, `${'x'.repeat(79)}B`)
+  assert.equal(atBound.status, 'pass')
+  assert.equal(atBound.summary.checked, 2)
+  assert.equal(atBound.summary.subjects, 2)
+  assert.notEqual(atBound.entries[0].subject, atBound.entries[1].subject)
+
+  const beyondBound = reportFor(`${'x'.repeat(80)}A`, `${'x'.repeat(80)}B`)
+  assert.equal(beyondBound.status, 'pass')
+  assert.equal(beyondBound.summary.checked, 2)
+  assert.equal(beyondBound.summary.subjects, 2)
+  assert.equal(beyondBound.entries[0].subject, beyondBound.entries[1].subject,
+    'the display bound is allowed to shorten labels, but not to change the raw count')
+})
+
 test('history v2 keeps duplicate-id correction relationships as source candidates', () => {
   const first = createEvent(draft({ id: 'SHARED', subject: 'a.md' }))
   const second = createEvent(draft({ id: 'SHARED', subject: 'b.md', afterHash: H2,
