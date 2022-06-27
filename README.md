@@ -158,9 +158,12 @@ in-memory event objects and is not a redacted report boundary.
 Every untrusted string in either output -- a path, a message, an excerpt
 -- is bounded and escaped. Control characters (C0, DEL and C1, which is where
 U+0085 hides), line separators, and bidirectional overrides become visible
-escape text. File labels additionally double literal backslashes, so an actual
-control character and text that merely spells its escape cannot produce the
-same label. A long file label carries a short prefix, its UTF-16 length, and a
+escape text. Default-ignorable characters such as U+034F and supplementary
+variation selectors also render as visible UTF-16 escape text; exact stored
+field values and comparisons are unchanged. File labels additionally double
+literal backslashes, so an actual control character and text that merely
+spells its escape cannot produce the same label. A long file label carries a
+short prefix, its UTF-16 length, and a
 SHA-256 digest of its full UTF-16 path. A crafted id or file name cannot forge
 a line in the human report or reverse what it says.
 

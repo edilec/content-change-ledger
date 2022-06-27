@@ -182,6 +182,49 @@ test('history v2 renders accepted bidi-marked descriptive fields safely in JSON'
   assert.match(report.entries[0].reason, /review\\u202enote/u)
 })
 
+test('invisible default-ignorable event fields stay exact but render as visible escape text', async () => {
+  for (const code of [0x034f, 0x200b, 0xfe0f, 0xe0100]) {
+    const hidden = String.fromCodePoint(code)
+    const subject = `pricing${hidden}.md`
+    const owner = `content-team${hidden}`
+    const releaseId = `2026.09.0${hidden}`
+    const event = createEvent(draft({ subject, owner, releaseId }))
+    const serialized = serializeEvent(event)
+    assert.equal(serialized.includes(hidden), false, `U+${code.toString(16)} survived the ledger line`)
+    assert.equal(JSON.parse(serialized).subject, subject, 'escaping must not change the stored identity')
+    const history = historyReport([{ file: 'ledger.jsonl', text: serialized + NEWLINE }])
+    assert.equal(history.status, 'pass')
+    assert.equal(JSON.stringify(history).includes(hidden), false)
+    assert.match(history.entries[0].subject, /\\u[0-9a-f]{4}/u)
+    assert.equal(formatHistory(history).includes(hidden), false)
+  }
+
+  await withDirectory(async (directory) => {
+    const hidden = String.fromCodePoint(0x034f)
+    await writeFile(join(directory, 'config.json'), JSON.stringify({ schemaVersion: '1', owners: ['content-team'] }))
+    const invokeOwner = async (owner) => {
+      const event = createEvent(draft({ owner }))
+      await writeFile(join(directory, 'ledger.jsonl'), serializeEvent(event) + NEWLINE)
+      return {
+        json: await cli(['verify', 'ledger.jsonl', '--root', directory, '--config', 'config.json', '--json'], directory),
+        human: await cli(['verify', 'ledger.jsonl', '--root', directory, '--config', 'config.json'], directory),
+      }
+    }
+    const ordinary = await invokeOwner('content-team')
+    assert.equal(ordinary.json.code, 0)
+    assert.equal(JSON.parse(ordinary.json.stdout).status, 'pass')
+    const distinct = await invokeOwner(`content-team${hidden}`)
+    assert.equal(distinct.json.code, 1)
+    assert.equal(JSON.parse(distinct.json.stdout).status, 'fail')
+    assert.equal(distinct.human.code, 1)
+    assert.match(distinct.human.stdout, /event-owner-not-allowed/u)
+    for (const output of [distinct.json.stdout, distinct.human.stdout]) {
+      assert.equal(output.includes(hidden), false)
+      assert.match(output, /\\u034f/u)
+    }
+  })
+})
+
 function draft(overrides = {}) {
   return {
     id: 'evt-0001',

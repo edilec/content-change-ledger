@@ -80,7 +80,9 @@ function isControlCodePoint(code) {
 }
 
 /**
- * Everything above, plus the bidirectional formatting characters.
+ * Everything above, plus the bidirectional formatting characters and default-
+ * ignorable code points such as U+034F. The latter can make two raw-distinct
+ * subjects, owners or release IDs look identical in a report.
  *
  * U+202E (RIGHT-TO-LEFT OVERRIDE) and its relatives do not end a line; they
  * reverse or hide what is displayed after them, which is how a crafted id makes
@@ -88,12 +90,15 @@ function isControlCodePoint(code) {
  * content in right-to-left text, so they are accepted inside a field and
  * escaped on the way out rather than refused on the way in.
  */
+const DEFAULT_IGNORABLE = /\p{Default_Ignorable_Code_Point}/u
+
 function isUnsafeInOutput(code) {
   return isControlCodePoint(code)
     || code === 0x200e
     || code === 0x200f
     || (code >= 0x202a && code <= 0x202e)
     || (code >= 0x2066 && code <= 0x2069)
+    || DEFAULT_IGNORABLE.test(String.fromCodePoint(code))
 }
 
 /** True when a string carries no control character, DEL, C1, or line separator. */
@@ -104,12 +109,21 @@ export function isControlFree(text) {
   return true
 }
 
-/** Write every unsafe character as its own escape text, leaving the rest exactly as it is. */
+/** Write unsafe code points as JSON-valid UTF-16 escapes, preserving raw identity. */
 function escapeUnsafe(characters) {
   let out = ''
   for (const character of characters) {
     const code = character.codePointAt(0)
-    out += isUnsafeInOutput(code) ? `\\u${code.toString(16).padStart(4, '0')}` : character
+    if (!isUnsafeInOutput(code)) {
+      out += character
+    } else if (code <= 0xffff) {
+      out += `\\u${code.toString(16).padStart(4, '0')}`
+    } else {
+      const offset = code - 0x10000
+      const high = 0xd800 + (offset >> 10)
+      const low = 0xdc00 + (offset & 0x3ff)
+      out += `\\u${high.toString(16)}\\u${low.toString(16)}`
+    }
   }
   return out
 }
