@@ -225,6 +225,45 @@ test('invisible default-ignorable event fields stay exact but render as visible 
   })
 })
 
+test('literal escape text and an invisible identity remain distinct in history output', async () => {
+  const hidden = String.fromCodePoint(0x034f)
+  const raw = { subject: `page${hidden}A`, owner: `team${hidden}`, releaseId: `r${hidden}1` }
+  const literal = { subject: 'page\\u034fA', owner: 'team\\u034f', releaseId: 'r\\u034f1' }
+  const first = createEvent(draft({ id: 'evt-a', ...raw }))
+  const second = createEvent(draft({ id: 'evt-b', ...literal, afterHash: H2,
+    recordedAt: '2026-09-02T09:00:00.000Z' }), first.hash)
+  const text = [first, second].map(serializeEvent).join(NEWLINE) + NEWLINE
+  const report = historyReport([{ file: 'ledger.jsonl', text }])
+  assert.equal(report.status, 'pass')
+  assert.equal(report.summary.subjects, 2)
+  assert.deepEqual(report.entries.map(entry => entry.pointer), ['/events/0', '/events/1'])
+  for (const field of ['subject', 'owner', 'releaseId']) {
+    assert.notEqual(report.entries[0][field], report.entries[1][field], field)
+  }
+  assert.equal(JSON.stringify(report).includes(hidden), false)
+  assert.deepEqual(historyReport([{ file: 'ledger.jsonl', text }], { owner: raw.owner })
+    .entries.map(entry => entry.pointer), ['/events/0'])
+  assert.deepEqual(historyReport([{ file: 'ledger.jsonl', text }], { owner: literal.owner })
+    .entries.map(entry => entry.pointer), ['/events/1'])
+
+  const sameRaw = createEvent(draft({ id: 'evt-b', ...raw, action: 'update',
+    beforeHash: H1, afterHash: H2, recordedAt: '2026-09-02T09:00:00.000Z' }), first.hash)
+  const good = historyReport([{ file: 'ledger.jsonl',
+    text: [first, sameRaw].map(serializeEvent).join(NEWLINE) + NEWLINE }])
+  assert.equal(good.status, 'pass')
+  assert.equal(good.summary.subjects, 1)
+
+  await withDirectory(async directory => {
+    await writeFile(join(directory, 'ledger.jsonl'), text)
+    const result = await cli(['history', 'ledger.jsonl', '--root', directory, '--json'], directory)
+    assert.equal(result.code, 0)
+    const rows = JSON.parse(result.stdout).entries
+    for (const field of ['subject', 'owner', 'releaseId']) {
+      assert.notEqual(rows[0][field], rows[1][field], `CLI ${field}`)
+    }
+  })
+})
+
 function draft(overrides = {}) {
   return {
     id: 'evt-0001',

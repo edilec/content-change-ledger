@@ -109,12 +109,14 @@ export function isControlFree(text) {
   return true
 }
 
-/** Write unsafe code points as JSON-valid UTF-16 escapes, preserving raw identity. */
-function escapeUnsafe(characters) {
+/** Escape unsafe code points; double raw backslashes only for display, never JSON syntax. */
+function escapeUnsafe(characters, escapeLiteralBackslashes = false) {
   let out = ''
   for (const character of characters) {
     const code = character.codePointAt(0)
-    if (!isUnsafeInOutput(code)) {
+    if (escapeLiteralBackslashes && character === '\\') {
+      out += '\\\\'
+    } else if (!isUnsafeInOutput(code)) {
       out += character
     } else if (code <= 0xffff) {
       out += `\\u${code.toString(16).padStart(4, '0')}`
@@ -136,12 +138,14 @@ function escapeUnsafe(characters) {
  * newline or a NEL must not be able to forge an extra line in the human report,
  * a line separator must not split a JSON value in a consumer that treats U+2028
  * as a break, and a right-to-left override must not reverse the text a reader
- * sees.
+ * sees. Literal backslashes are doubled for display so a raw `\\u034f` cannot
+ * impersonate the visible escape for a distinct U+034F identity. Stored JSON
+ * takes the other path: JSON.stringify already escapes its literal backslashes.
  */
 export function sanitize(text, max = 120) {
   const characters = Array.from(String(text))
   const bounded = characters.length > max ? [...characters.slice(0, max), ' [...]'] : characters
-  return escapeUnsafe(bounded)
+  return escapeUnsafe(bounded, true)
 }
 
 /**
