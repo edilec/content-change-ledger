@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1",
+  "owners": ["content-team", "docs-team"],
+  "releaseIdPattern": "^\\d{4}\\.\\d{2}\\.\\d+$",
+  "head": {
+    "id": "evt-0004",
+    "hash": "sha256:4b0a7fc3a862f69836fcca35c72975436c1f8d9e928eeda769e76b9a7f76d5ac"
+  },
+  "limits": {
+    "maxEvents": 10000,
+    "maxEventBytes": 8192
+  }
+}
