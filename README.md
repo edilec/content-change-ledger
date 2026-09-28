@@ -27,8 +27,10 @@ Nothing is ever edited. A mistake in a recorded event is fixed by appending a
 Node 22 or newer. No runtime dependencies and no build step.
 
 ```sh
-npm install content-change-ledger
+npm install github:edilec/content-change-ledger
 ```
+
+This installs the public GitHub source; `content-change-ledger` is not published to npm.
 
 Or run it from a checkout:
 
@@ -40,23 +42,23 @@ node bin/content-change-ledger.mjs --help
 
 ```sh
 # record a change
-content-change-ledger append ledger.jsonl \
+npx content-change-ledger append ledger.jsonl \
   --subject content/pricing.md --action update \
   --after-file content/pricing.md \
   --reason "Team plan moved to 49 USD" --owner content-team --release 2026.09.1
 
 # fix a mistake in an earlier event without touching it
-content-change-ledger append ledger.jsonl \
+npx content-change-ledger append ledger.jsonl \
   --subject content/pricing.md --action correct --corrects evt-0002 \
   --after sha256:d67ce779... \
   --reason "evt-0002 recorded the wrong release" --owner content-team --release 2026.09.2
 
 # check the whole chain against a policy and a head checkpoint
-content-change-ledger verify examples/ledger.jsonl --config examples/ledger-policy.json
+npx content-change-ledger verify examples/ledger.jsonl --config examples/ledger-policy.json
 
 # read the history back
-content-change-ledger history examples/ledger.jsonl --subject content/pricing.md
-content-change-ledger history examples/ledger.jsonl --release 2026.09.1 --json
+npx content-change-ledger history examples/ledger.jsonl --subject content/pricing.md
+npx content-change-ledger history examples/ledger.jsonl --release 2026.09.1 --json
 ```
 
 | Option | Verb | Meaning |
