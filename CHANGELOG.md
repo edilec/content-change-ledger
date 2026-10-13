@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented in this file.
 
-## Unreleased
+## 0.1.0 — 2026-10-14
 
 ### Fixed
 
@@ -87,4 +87,4 @@ removed from the source:
   `history` as well as `verify`: exit 2 carries the report, and only a usage or
   configuration error leaves stdout empty.
 
-No release has been published.
+GitHub source release v0.1.0 — 2026-10-14.
